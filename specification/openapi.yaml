@@ -1,0 +1,355 @@
+openapi: 3.1.0
+jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
+info:
+  title: Fields of the World - Web API
+  description: |-
+    The API for a web application that runs the FTW tooling on the web through a RESTful interface.
+  version: 0.1.0
+servers:
+  - url: http://api.fieldsofthe.world
+paths:
+  /:
+    get:
+      summary: Returns the basic server capabilities.
+      operationId: connect
+      description: |-
+        This is the landing page of the API.
+        It provides information about the server's capabilities and available endpoints.
+      responses:
+        200:
+          description: A JSON array of user names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_version:
+                    type: string
+                    const: 0.1.0
+                    description: The version of the API (see `info.version`)
+                  title:
+                    type: string
+                    description: The title of the API
+                  description:
+                    type: string
+                    description: A description of the API
+  /models:
+    get:
+      summary: Returns the list of available models.
+      operationId: getModels
+      description: |-
+        This endpoint returns a list of available models.
+      responses:
+        200:
+          description: A JSON array of model names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          description: The id of the model
+                        title:
+                          type: string
+                          description: The title of the model
+                        description:
+                          type: string
+                          description: A description of the model
+                        license:
+                          type: string
+                          description: The license of the model
+  /projects:
+    post:
+      summary: Create a new project
+      operationId: createProject
+      description: |-
+        This endpoint creates a new project for the authenticated user.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: The title of the project
+      responses:
+        201:
+          description: A JSON object with the created project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+    get:
+      summary: List of available projects
+      operationId: getProjects
+      description: |-
+        This endpoint returns a list of available projects for the user.
+      security:
+        - bearer: []
+      responses:
+        200:
+          description: A list of projects for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+  /projects/{project_id}:
+    get:
+      summary: Get project details
+      operationId: getProject
+      description: |-
+        This endpoint returns the details of a specific project.
+      security:
+        - bearer: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          description: The id of the project to retrieve
+          schema:
+            type: string
+      responses:
+        200:
+          description: A JSON object with the project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+  /projects/{project_id}/images/{window}:
+    put:
+      summary: Upload a raster image to a project
+      operationId: uploadImage
+      description: |-
+        This endpoint uploads a raster image to a specific project.
+      security:
+        - bearer: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          description: The id of the project to upload the image to
+          schema:
+            type: string
+        - name: window
+          in: path
+          required: true
+          description: The window of the image to upload
+          schema:
+            type: string
+            enum:
+              - a
+              - b
+      requestBody:
+        required: true
+        content:
+          image/*:
+            schema:
+              type: string
+              format: binary
+              description: The raster image to upload
+      responses:
+        201:
+          description: Upload succeeded.
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+  /projects/{project_id}/inference:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        description: The id of the project to retrieve the inference results for
+        schema:
+          type: string
+    get:
+      summary: Get inference results that have the status 'completed'
+      operationId: getInferenceResults
+      description: |-
+        This endpoint returns the inference results for a specific project.
+      security:
+        - bearer: []
+      responses:
+        200:
+          $ref: "#/components/responses/InferenceResult"
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+    put:
+      summary: Run inference
+      operationId: inference
+      description: |-
+        This endpoint takes raster images and starts processing.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceParameters'
+      responses:
+        200:
+          $ref: "#/components/responses/InferenceResult"
+        202:
+          description: Successfully queued for processing
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+components:
+  responses:
+    InferenceResult:
+      description: The image with the inference results or the GeoJSON with the polygons after polygponization.
+      content:
+        image/*:
+          schema:
+            type: string
+            format: binary
+            description: The image with the inference results
+        application/geo+json:
+          schema:
+            $ref: 'https://geojson.org/schema/FeatureCollection.json'
+    4XX:
+      description: Client error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    5XX:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    InferenceParameters:
+      type: object
+      required:
+        - model
+        - images
+        - polygonization
+      properties:
+        queue:
+          type: boolean
+          description: Whether to queue the inference (`true`, for larger areas) or run it immediately and return the result in the response (`false`, for smaller areas)
+          default: true
+        model:
+          type: string
+          description: The id of the model to use for inference, must be one of the IDs made available through `GET /models`
+        images:
+          oneOf:
+            - type: "null"
+              description: No images provided, inference will be run on the two images uploaded to the project
+            - type: array
+              description: A list of two publicly accessible image URLs (window A and B) to run inference on
+              minItems: 2
+              maxItems: 2
+              items:
+                type: string
+                format: url
+                description: The raster image to run inference on
+        resize_factor:
+          type: number
+          description: |-
+            Resize factor to use for inference.
+          default: 2
+        patch_size:
+          type: integer
+          description: |-
+            Size of patch to use for inference.
+            Defaults to 1024 unless the image is < 1024x1024px.
+          default: 1024
+        padding:
+          type: integer
+          description: |-
+            Pixels to discard from each side of the patch.
+          default: 64
+        polygonize:
+          oneOf:
+            - type: "null"
+              description: Disable polygonization
+            - type: object
+              description: Enable polygonization with the given options
+              properties:
+                simplify:
+                  type: number
+                  description: |-
+                    Simplification factor to use when polygonizing in the unit of the CRS, e.g. meters for Sentinel-2 imagery in UTM.
+                    Set to 0 to disable simplification.
+                  default: 15
+                min_size:
+                  type: number
+                  description: |-
+                    Minimum area size in square meters to include in the output.
+                  default: 500
+                close_interiors:
+                  type: boolean
+                  description: |-
+                    Remove the interiors holes in the polygons if set to `true`.
+                  default: false
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: The error message
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The id of the project
+        title:
+          type: string
+          description: The title of the project
+        status:
+          type: string
+          description: |-
+            The status of a queued inference run.
+
+            - Set to `created` by default when the project has been created.
+            - Set to `queued` when the project is queued for processing.
+            - Set to `running` when the project is being processed.
+            - Set to `completed` when the project has been processed and the results are available.
+            - Set to `failed` when the project has failed to process.
+          enum:
+            - created
+            - queued
+            - running
+            - completed
+            - failed
+        progress:
+          type: number
+          description: The progress of a queued inference run (0-100%)
+          minimum: 0
+          maximum: 100
+        created_at:
+          type: string
+          format: date-time
+          description: The creation date of the project
+        parameters:
+          oneOf:
+            - type: "null"
+            - $ref: '#/components/schemas/InferenceParameters'
+  securitySchemes:
+    bearer:
+      description: Bearer token
+      type: http
+      scheme: Bearer
