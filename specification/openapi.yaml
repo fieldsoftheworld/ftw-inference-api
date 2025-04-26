@@ -64,6 +64,9 @@ paths:
                         license:
                           type: string
                           description: The license of the model
+                        version:
+                          type: string
+                          description: The version of the model
   /projects:
     post:
       summary: Create a new project

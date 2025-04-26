@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ftw-inference-api"
+version = "0.1.0"
+authors = [
+  {name = "Fields of the World", email = "info@fieldsoftheworld.org"},
+]
+description = "FastAPI implementation of the Fields of the World Inference API"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/fieldsoftheworld/ftw-inference-api"
+"Bug Tracker" = "https://github.com/fieldsoftheworld/ftw-inference-api/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["server/test"]
+
+[tool.ruff]
+# Enable recommended rules
+lint.select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "RUF", # Ruff-specific rules
+]
+
+# Same line length as before
+line-length = 88
+# Target Python version
+target-version = "py310"
+# Set docstring convention
+lint.pydocstyle.convention = "google"
+# Exclude specific directories
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "*.pyc",
+    ".venv",
+    "venv",
+    ".env",
+    "env",
+    "node_modules",
+]
+
+# Handle unused imports/variables
+lint.ignore = [
+    "B008",  # todo: check later
+]
+
+[tool.ruff.format]
+# Use double quotes for consistency
+quote-style = "double"
+# Line endings
+line-ending = "auto"
+# Match style
+preview = true

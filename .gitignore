@@ -1,0 +1,6 @@
+/server/data/
+__pycache__/
+/server/.pytest_cache/
+/.ruff_cache/
+/.mypy_cache/
+/server/.coverage
