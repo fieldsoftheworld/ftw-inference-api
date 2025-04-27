@@ -225,7 +225,10 @@ async def run_inference(
 
 @router.get("/projects/{project_id}/inference")
 async def get_inference_results(
-    project_id: str, db: Session = Depends(get_db), auth: dict = Depends(verify_auth)
+    project_id: str,
+    db: Session = Depends(get_db),
+    auth: dict = Depends(verify_auth),
+    content_type: str | None = None,
 ):
     """
     Get inference results for a project
@@ -247,29 +250,54 @@ async def get_inference_results(
             ),
         )
 
-    # Get the latest inference result
-    latest_result = (
+    # Get the latest inference results
+    image_result = None
+    geojson_result = None
+
+    # Query for both result types
+    results = (
         db.query(InferenceResult)
         .filter(InferenceResult.project_id == project_id)
         .order_by(InferenceResult.created_at.desc())
-        .first()
+        .all()
     )
 
-    if not latest_result:
+    # Find the latest of each type
+    for result in results:
+        if result.result_type == "image" and image_result is None:
+            image_result = result
+        elif result.result_type == "geojson" and geojson_result is None:
+            geojson_result = result
+
+        # Break if we found both
+        if image_result and geojson_result:
+            break
+
+    if not image_result and not geojson_result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No inference results found for this project",
         )
 
-    # Return appropriate response based on result type
-    if latest_result.result_type == "image":
-        return FileResponse(
-            path=latest_result.file_path,
-            media_type="image/tiff",
-            filename=f"inference_{project_id}.tif",
-        )
-    else:  # geojson
-        with open(latest_result.file_path) as f:
-            geojson_data = json.load(f)
+    # Handle content negotiation based on Content-Type header
+    if content_type:
+        if "geo+json" in content_type and geojson_result:
+            # Return GeoJSON format
+            with open(geojson_result.file_path) as f:
+                geojson_data = json.load(f)
+            return JSONResponse(content=geojson_data, media_type="application/geo+json")
+        elif "tiff" in content_type and image_result:
+            # Return tiff image
+            return FileResponse(
+                path=image_result.file_path,
+                media_type="image/tiff",
+                filename=f"inference_{project_id}.tif",
+            )
 
-        return JSONResponse(content=geojson_data, media_type="application/geo+json")
+    # Default: Return JSON with URLs to the data
+    response_data = {
+        "inference": "https://host.example/inference.tif",
+        "polygons": "https://host.example/polygons.json" if geojson_result else None,
+    }
+
+    return JSONResponse(content=response_data, media_type="application/json")

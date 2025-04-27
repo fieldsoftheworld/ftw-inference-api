@@ -146,7 +146,7 @@ paths:
       requestBody:
         required: true
         content:
-          image/*:
+          image/tiff:
             schema:
               type: string
               format: binary
@@ -173,6 +173,18 @@ paths:
         This endpoint returns the inference results for a specific project.
       security:
         - bearer: []
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          description: |-
+            The content type of the request.
+
+            - If set to `application/geo+json`, the response will contain polygons (if available).
+            - If set to `image/tiff` (or any subtype/profile), the response contain the inference image.
+            - If not set specifically, returns the URLs to the data as JSON.
+          schema:
+            type: string
       responses:
         200:
           $ref: "#/components/responses/InferenceResult"
@@ -205,9 +217,30 @@ paths:
 components:
   responses:
     InferenceResult:
-      description: The image with the inference results or the GeoJSON with the polygons after polygponization.
+      description: |-
+        The image with the inference results or the GeoJSON with the polygons after polygponization.
+
+        If both imagery and polygons have been created, use content negotiation to get the desired format.
       content:
-        image/*:
+        application/json:
+          schema:
+            type: object
+            required:
+              - inference
+            properties:
+              inference:
+                type: string
+                format: uri
+                description: The URL to the inference results
+              polygons:
+                default: null
+                oneOf:
+                  - type: "null"
+                    description: No polygons available
+                  - type: string
+                    format: uri
+                    description: The URL to the polygons
+        image/tiff:
           schema:
             type: string
             format: binary
