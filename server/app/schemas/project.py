@@ -1,7 +1,14 @@
-from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+import pendulum
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+)
+
+from app.core.types import PendulumDateTime
 
 
 class ProjectStatus(str, Enum):
@@ -50,12 +57,20 @@ class ProjectResponse(BaseModel):
     id: str
     title: str
     status: ProjectStatus
-    progress: float
-    created_at: datetime
+    progress: float | None = None
+    created_at: PendulumDateTime
     parameters: InferenceParameters | None = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(
+        from_attributes=True,  # Replaces orm_mode=True
+    )
+
+    @field_serializer("created_at")
+    def serialize_datetime(self, dt: pendulum.DateTime) -> str:
+        """Serialize pendulum DateTime to ISO8601 string with Z timezone designator"""
+        if isinstance(dt, pendulum.DateTime):
+            return dt.in_timezone("UTC").isoformat().replace("+00:00", "Z")
+        return str(dt)
 
 
 class ProjectsResponse(BaseModel):

@@ -1,3 +1,8 @@
+import re
+
+DATETIME_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"
+
+
 def test_root_endpoint(client):
     """Test the root endpoint"""
     response = client.get("/")
@@ -19,7 +24,8 @@ def test_create_project(client):
     assert "id" in data
     assert data["title"] == "Test Project"
     assert data["status"] == "created"
-    assert data["progress"] == 0.0
+    assert data["progress"] is None
+    assert re.match(DATETIME_RE, data["created_at"])
 
 
 def test_get_projects(client):
@@ -48,6 +54,9 @@ def test_get_project(client):
     data = response.json()
     assert data["id"] == project_id
     assert data["title"] == "Single Test Project"
+    assert data["status"] == "created"
+    assert data["progress"] is None
+    assert re.match(DATETIME_RE, data["created_at"])
 
 
 def test_get_nonexistent_project(client):

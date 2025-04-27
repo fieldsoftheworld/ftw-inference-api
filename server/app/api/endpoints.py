@@ -173,17 +173,17 @@ async def run_inference(
         )
 
     # Update project with parameters
-    project.parameters = inference_params.dict()
+    project.parameters = inference_params.model_dump()
     db.commit()
 
     # If queue is True, queue the inference task and return status 202
     if inference_params.queue:
         project.status = "queued"
-        project.progress = 0.0
+        project.progress = None
         db.commit()
 
         # Start the inference task in the background
-        run_inference_task(project_id, inference_params.dict())
+        run_inference_task(project_id, inference_params.model_dump())
 
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
@@ -196,7 +196,9 @@ async def run_inference(
             db.commit()
 
             # Process inference
-            result = process_inference_queue(project_id, inference_params.dict(), db)
+            result = process_inference_queue(
+                project_id, inference_params.model_dump(), db
+            )
 
             # Return appropriate response based on result type
             if result.result_type == "image":

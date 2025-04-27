@@ -54,7 +54,7 @@ async def verify_auth(
     """
     # Check if authentication is disabled in config
     if get_settings().auth_disabled:
-        return {"sub": "disabled_auth_user"}
+        return {"sub": "guest_user"}
 
     # Normal authentication flow
     return verify_token(credentials.credentials)

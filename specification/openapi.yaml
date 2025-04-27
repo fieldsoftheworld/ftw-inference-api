@@ -301,6 +301,11 @@ components:
           description: The error message
     Project:
       type: object
+      required:
+        - id
+        - title
+        - status
+        - created_at
       properties:
         id:
           type: string
@@ -325,15 +330,19 @@ components:
             - completed
             - failed
         progress:
-          type: number
-          description: The progress of a queued inference run (0-100%)
-          minimum: 0
-          maximum: 100
+          default: null
+          oneOf:
+            - type: "null"
+            - type: number
+              description: The progress of a queued inference run (0-100%)
+              minimum: 0
+              maximum: 100
         created_at:
           type: string
           format: date-time
           description: The creation date of the project
         parameters:
+          default: null
           oneOf:
             - type: "null"
             - $ref: '#/components/schemas/InferenceParameters'

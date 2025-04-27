@@ -1,11 +1,10 @@
-import datetime
 import enum
 import uuid
 
+import pendulum
 from sqlalchemy import (
     JSON,
     Column,
-    DateTime,
     Float,
     ForeignKey,
     String,
@@ -13,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
+from app.db.utils.pendulum_types import PendulumDateTime
 
 
 class ProjectStatus(str, enum.Enum):
@@ -29,8 +29,8 @@ class Project(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, index=True)
     status = Column(String, default=ProjectStatus.CREATED)
-    progress = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    progress = Column(Float, default=None, nullable=True)
+    created_at = Column(PendulumDateTime, default=lambda: pendulum.now("UTC"))
     parameters = Column(JSON, nullable=True)
 
     # Relationships
@@ -49,7 +49,7 @@ class Image(Base):
     project_id = Column(String, ForeignKey("projects.id"))
     window = Column(String)  # 'a' or 'b'
     file_path = Column(String)  # Path to the stored image
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(PendulumDateTime, default=lambda: pendulum.now("UTC"))
 
     # Relationships
     project = relationship("Project", back_populates="images")
@@ -63,7 +63,7 @@ class InferenceResult(Base):
     model_id = Column(String)
     result_type = Column(String)  # 'image' or 'geojson'
     file_path = Column(String)  # Path to the stored result
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(PendulumDateTime, default=lambda: pendulum.now("UTC"))
 
     # Relationships
     project = relationship("Project", back_populates="inference_results")
