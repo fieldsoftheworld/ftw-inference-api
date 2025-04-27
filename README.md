@@ -71,7 +71,6 @@ python run.py --config /path/to/custom_config.yaml
 The API provides the following endpoints:
 
 - `GET /`: Root endpoint that returns basic API information
-- `GET /models`: Returns a list of available inference models
 - `POST /projects`: Create a new project
 - `GET /projects`: List all projects
 - `GET /projects/{project_id}`: Get details of a specific project

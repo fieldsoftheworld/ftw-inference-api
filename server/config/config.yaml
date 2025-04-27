@@ -1,22 +1,19 @@
-api:
-  title: "Fields of the World - Inference API"
-  description: "A service for field boundary inference from satellite images."
-  version: "0.1.0"
+title: "Fields of the World - Inference API"
+description: "A service for field boundary inference from satellite images."
+version: "0.1.0"
 
 server:
   host: "0.0.0.0"
   port: 8000
   debug: false
+  database_url: "sqlite:///./data/ftw_inference.db"
+  cors:
+    origins: ["*"]  # Allow all origins (CORS)
 
-database:
-  url: "sqlite:///./data/ftw_inference.db"
-
-cors:
-  origins: ["*"]
-
-# Security configuration
 security:
   auth_disabled: false  # Set to true to disable authentication
+  secret_key: "your_secret" # Secret key for JWT token signing
+  access_token_expire_minutes: 30  # Token expiration time in minutes
 
 # Models configuration
 models:

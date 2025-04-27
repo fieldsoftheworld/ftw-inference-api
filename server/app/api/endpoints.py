@@ -14,7 +14,6 @@ from app.db.database import get_db
 from app.models.project import Image, InferenceResult, Project
 from app.schemas.project import (
     InferenceParameters,
-    ModelsResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectsResponse,
@@ -43,39 +42,8 @@ async def get_root():
         "api_version": settings.api_version,
         "title": title,
         "description": description,
+        "models": settings.models,
     }
-
-
-@router.get("/models", response_model=ModelsResponse)
-async def get_models():
-    """
-    Returns the list of available models
-    """
-    settings = get_settings()
-
-    # Get configurable models from settings
-    models = settings.models_config
-
-    # If no models are configured, return a default model for demo purposes
-    if not models:
-        models = [
-            {
-                "id": "default_model",
-                "title": "Default FTW Model",
-                "description": "Default model for Fields of the World inference",
-                "license": "MIT",
-                "version": "v1",
-            }
-        ]
-    else:
-        # Create a copy of the models list
-        # without the file property for the API response
-        models = [
-            {key: value for key, value in model.items() if key != "file"}
-            for model in models
-        ]
-
-    return {"models": models}
 
 
 @router.post(

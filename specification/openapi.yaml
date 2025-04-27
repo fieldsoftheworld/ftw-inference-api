@@ -33,20 +33,6 @@ paths:
                   description:
                     type: string
                     description: A description of the API
-  /models:
-    get:
-      summary: Returns the list of available models.
-      operationId: getModels
-      description: |-
-        This endpoint returns a list of available models.
-      responses:
-        200:
-          description: A JSON array of model names
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
                   models:
                     type: array
                     items:
@@ -255,7 +241,7 @@ components:
           default: true
         model:
           type: string
-          description: The id of the model to use for inference, must be one of the IDs made available through `GET /models`
+          description: The id of the model to use for inference, must be one of the IDs made available through `GET /`
         images:
           oneOf:
             - type: "null"

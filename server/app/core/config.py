@@ -26,16 +26,14 @@ class Settings(BaseSettings):
     # CORS settings
     cors_origins: list[str] = ["*"]
 
-    # Root endpoint and models settings
-    models_config: list[dict[str, Any]] = Field(default_factory=list)
+    # Lift of available models
+    models: list[dict[str, Any]] = Field(default_factory=list)
 
     # Security
-    secret_key: str = "change_this_in_production"
+    secret_key: str = "ftw_1234567890"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     auth_disabled: bool = False  # Option to disable authentication
-
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     def load_from_yaml(self, config_file: Path | str):
         """Load configuration from a YAML file"""
@@ -47,36 +45,28 @@ class Settings(BaseSettings):
             config = yaml.safe_load(f)
 
         # Load API settings if they exist
-        if "api" in config:
-            api_config = config["api"]
-            self.api_title = api_config.get("title", self.api_title)
-            self.api_description = api_config.get("description", self.api_description)
-            self.api_version = api_config.get("version", self.api_version)
-
-        if "models" in config:
-            self.models_config = config["models"]
+        self.api_title = config.get("title", self.api_title)
+        self.api_description = config.get("description", self.api_description)
+        self.api_version = config.get("version", self.api_version)
+        self.models = config.get("models", self.models)
 
         # Load server configuration values if they exist
-        if "server" in config:
-            server_config = config["server"]
-            self.host = server_config.get("host", self.host)
-            self.port = server_config.get("port", self.port)
-            self.debug = server_config.get("debug", self.debug)
+        server_config = config.get("server", {})
+        self.host = server_config.get("host", self.host)
+        self.port = server_config.get("port", self.port)
+        self.debug = server_config.get("debug", self.debug)
+        self.cors_origins = server_config.get("cors", {}).get(
+            "origins", self.cors_origins
+        )
+        self.database_url = server_config.get("database_url", self.database_url)
 
-        if "cors" in config:
-            self.cors_origins = config.get("cors", {}).get("origins", self.cors_origins)
-
-        # Load security settings if they exist
-        if "security" in config:
-            security_config = config["security"]
-            self.auth_disabled = security_config.get(
-                "auth_disabled", self.auth_disabled
-            )
-
-        # Load database settings if they exist
-        if "database" in config:
-            database_config = config["database"]
-            self.database_url = database_config.get("url", self.database_url)
+        security_config = config.get("security", {})
+        self.secret_key = security_config.get("secret_key", self.secret_key)
+        self.algorithm = security_config.get("algorithm", self.algorithm)
+        self.access_token_expire_minutes = security_config.get(
+            "access_token_expire_minutes", self.access_token_expire_minutes
+        )
+        self.auth_disabled = security_config.get("auth_disabled", self.auth_disabled)
 
 
 @lru_cache

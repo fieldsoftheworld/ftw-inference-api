@@ -74,11 +74,8 @@ class ModelInfo(BaseModel):
     version: str
 
 
-class ModelsResponse(BaseModel):
-    models: list[ModelInfo]
-
-
 class RootResponse(BaseModel):
     api_version: str
     title: str
     description: str
+    models: list[ModelInfo]

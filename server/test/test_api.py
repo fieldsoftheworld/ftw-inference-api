@@ -6,13 +6,6 @@ def test_root_endpoint(client):
     assert "api_version" in data
     assert "title" in data
     assert "description" in data
-
-
-def test_models_endpoint(client):
-    """Test the models endpoint"""
-    response = client.get("/models")
-    assert response.status_code == 200
-    data = response.json()
     assert "models" in data
     assert isinstance(data["models"], list)
     assert len(data["models"]) > 0
