@@ -36,6 +36,9 @@ class InferenceParameters(BaseModel):
         True, description="Whether to queue the inference or run it immediately"
     )
     model: str = Field(..., description="The id of the model to use for inference")
+    bbox: list[float] | None = Field(
+        ..., description="Bounding box to use for inference [minx, miny, maxx, maxy]"
+    )
     images: list[str] | None = Field(
         None, description="A list of two publicly accessible image URLs"
     )

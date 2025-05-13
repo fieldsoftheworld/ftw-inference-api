@@ -1,5 +1,5 @@
 openapi: 3.1.0
-jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
+jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema'
 info:
   title: Fields of the World - Web API
   description: |-
@@ -186,8 +186,8 @@ paths:
           schema:
             type: string
       responses:
-        200:
-          $ref: "#/components/responses/InferenceResult"
+        '200':
+          $ref: '#/components/responses/InferenceResult'
         4XX:
           $ref: '#/components/responses/4XX'
         5XX:
@@ -206,9 +206,9 @@ paths:
             schema:
               $ref: '#/components/schemas/InferenceParameters'
       responses:
-        200:
-          $ref: "#/components/responses/InferenceResult"
-        202:
+        '200':
+          $ref: '#/components/responses/InferenceResult'
+        '202':
           description: Successfully queued for processing
         4XX:
           $ref: '#/components/responses/4XX'
@@ -235,7 +235,7 @@ components:
               polygons:
                 default: null
                 oneOf:
-                  - type: "null"
+                  - type: 'null'
                     description: No polygons available
                   - type: string
                     format: uri
@@ -268,6 +268,17 @@ components:
         - images
         - polygonization
       properties:
+        bbox:
+          type: array
+          description: |-
+            The bounding box of the area to run inference on.
+            The coordinates are in the order [minX, minY, maxX, maxY].
+            The coordinates are in the coordinate reference system (CRS) of the images.
+            If not provided, the bounding box will be calculated from the images.
+          items:
+            type: number
+          minItems: 4
+          maxItems: 4
         queue:
           type: boolean
           description: Whether to queue the inference (`true`, for larger areas) or run it immediately and return the result in the response (`false`, for smaller areas)
@@ -277,7 +288,7 @@ components:
           description: The id of the model to use for inference, must be one of the IDs made available through `GET /`
         images:
           oneOf:
-            - type: "null"
+            - type: 'null'
               description: No images provided, inference will be run on the two images uploaded to the project
             - type: array
               description: A list of two publicly accessible image URLs (window A and B) to run inference on
@@ -305,7 +316,7 @@ components:
           default: 64
         polygonize:
           oneOf:
-            - type: "null"
+            - type: 'null'
               description: Disable polygonization
             - type: object
               description: Enable polygonization with the given options
@@ -365,7 +376,7 @@ components:
         progress:
           default: null
           oneOf:
-            - type: "null"
+            - type: 'null'
             - type: number
               description: The progress of a queued inference run (0-100%)
               minimum: 0
@@ -377,7 +388,7 @@ components:
         parameters:
           default: null
           oneOf:
-            - type: "null"
+            - type: 'null'
             - $ref: '#/components/schemas/InferenceParameters'
   securitySchemes:
     bearer:

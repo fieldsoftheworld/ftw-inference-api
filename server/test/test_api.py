@@ -96,6 +96,7 @@ def test_upload_image_and_inference(client, tmp_path):
 
     # Run inference
     inference_params = {
+        "bbox": [0, 1, 2, 3],  # Example bounding box
         "queue": False,  # Don't queue for testing
         "model": "default_model",
         "images": None,  # Use uploaded images
@@ -131,6 +132,7 @@ def test_inference_without_images(client):
 
     # Run inference with image URLs
     inference_params = {
+        "bbox": None,  # No bounding box
         "queue": False,
         "model": "default_model",
         "images": ["http://example.com/image1.tif", "http://example.com/image2.tif"],
