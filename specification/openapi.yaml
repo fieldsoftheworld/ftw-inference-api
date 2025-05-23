@@ -53,6 +53,42 @@ paths:
                         version:
                           type: string
                           description: The version of the model
+  /example:
+    put:
+      summary: Compute polygons for a small area quickly
+      operationId: getExample
+      description: |-
+        This endpoint returns computed field boundaries over a small area and 
+        returns them as polygons in GeoJSON format.
+
+        Errors if the area is too large.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - inference
+                - polygons
+              properties:
+                inference:
+                  $ref: '#/components/schemas/InferenceParameters'
+                polygons:
+                  $ref: '#/components/schemas/PolygonizationParameters'
+      responses:
+        '200':
+          description: The GeoJSON with the polygons after polygponization.
+          content:
+            application/geo+json:
+              schema:
+                $ref: 'https://geojson.org/schema/FeatureCollection.json'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
   /projects:
     post:
       summary: Create a new project
@@ -159,39 +195,6 @@ paths:
         5XX:
           $ref: '#/components/responses/5XX'
   /projects/{project_id}/inference:
-    parameters:
-      - name: project_id
-        in: path
-        required: true
-        description: The id of the project to retrieve the inference results for
-        schema:
-          type: string
-    get:
-      summary: Get inference results that have the status 'completed'
-      operationId: getInferenceResults
-      description: |-
-        This endpoint returns the inference results for a specific project.
-      security:
-        - bearer: []
-      parameters:
-        - name: Content-Type
-          in: header
-          required: false
-          description: |-
-            The content type of the request.
-
-            - If set to `application/geo+json`, the response will contain polygons (if available).
-            - If set to `image/tiff` (or any subtype/profile), the response contain the inference image.
-            - If not set specifically, returns the URLs to the data as JSON.
-          schema:
-            type: string
-      responses:
-        '200':
-          $ref: '#/components/responses/InferenceResult'
-        4XX:
-          $ref: '#/components/responses/4XX'
-        5XX:
-          $ref: '#/components/responses/5XX'
     put:
       summary: Run inference
       operationId: inference
@@ -206,8 +209,30 @@ paths:
             schema:
               $ref: '#/components/schemas/InferenceParameters'
       responses:
-        '200':
-          $ref: '#/components/responses/InferenceResult'
+        '202':
+          description: Successfully queued for processing
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+  /projects/{project_id}/polygons:
+    put:
+      summary: Run polygponization
+      operationId: polygonize
+      description: |-
+        This endpoint queues an additional polygonization step in addition to the inference step.
+
+        Could also be used to run polygponization on an existing inference result,
+        i.e. re-runs polygonization with different parameters if desired.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceParameters'
+      responses:
         '202':
           description: Successfully queued for processing
         4XX:
@@ -216,38 +241,6 @@ paths:
           $ref: '#/components/responses/5XX'
 components:
   responses:
-    InferenceResult:
-      description: |-
-        The image with the inference results or the GeoJSON with the polygons after polygponization.
-
-        If both imagery and polygons have been created, use content negotiation to get the desired format.
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - inference
-            properties:
-              inference:
-                type: string
-                format: uri
-                description: The URL to the inference results
-              polygons:
-                default: null
-                oneOf:
-                  - type: 'null'
-                    description: No polygons available
-                  - type: string
-                    format: uri
-                    description: The URL to the polygons
-        image/tiff:
-          schema:
-            type: string
-            format: binary
-            description: The image with the inference results
-        application/geo+json:
-          schema:
-            $ref: 'https://geojson.org/schema/FeatureCollection.json'
     4XX:
       description: Client error
       content:
@@ -279,17 +272,15 @@ components:
             type: number
           minItems: 4
           maxItems: 4
-        queue:
-          type: boolean
-          description: Whether to queue the inference (`true`, for larger areas) or run it immediately and return the result in the response (`false`, for smaller areas)
-          default: true
         model:
           type: string
           description: The id of the model to use for inference, must be one of the IDs made available through `GET /`
         images:
           oneOf:
             - type: 'null'
-              description: No images provided, inference will be run on the two images uploaded to the project
+              description: >
+                No images provided, inference will be run on the two images uploaded to the project.
+                Errors when no impages are uploaded (or the request is synchronously executed).
             - type: array
               description: A list of two publicly accessible image URLs (window A and B) to run inference on
               minItems: 2
@@ -314,29 +305,26 @@ components:
           description: |-
             Pixels to discard from each side of the patch.
           default: 64
-        polygonize:
-          oneOf:
-            - type: 'null'
-              description: Disable polygonization
-            - type: object
-              description: Enable polygonization with the given options
-              properties:
-                simplify:
-                  type: number
-                  description: |-
-                    Simplification factor to use when polygonizing in the unit of the CRS, e.g. meters for Sentinel-2 imagery in UTM.
-                    Set to 0 to disable simplification.
-                  default: 15
-                min_size:
-                  type: number
-                  description: |-
-                    Minimum area size in square meters to include in the output.
-                  default: 500
-                close_interiors:
-                  type: boolean
-                  description: |-
-                    Remove the interiors holes in the polygons if set to `true`.
-                  default: false
+    PolygonizationParameters:
+      type: object
+      description: Polygonization parameters
+      properties:
+        simplify:
+          type: number
+          description: |-
+            Simplification factor to use when polygonizing in the unit of the CRS, e.g. meters for Sentinel-2 imagery in UTM.
+            Set to 0 to disable simplification.
+          default: 15
+        min_size:
+          type: number
+          description: |-
+            Minimum area size in square meters to include in the output.
+          default: 500
+        close_interiors:
+          type: boolean
+          description: |-
+            Remove the interiors holes in the polygons if set to `true`.
+          default: false
     Error:
       type: object
       properties:
@@ -350,6 +338,8 @@ components:
         - title
         - status
         - created_at
+        - parameters
+        - results
       properties:
         id:
           type: string
@@ -378,7 +368,7 @@ components:
           oneOf:
             - type: 'null'
             - type: number
-              description: The progress of a queued inference run (0-100%)
+              description: The progress of a queued run (0-100%)
               minimum: 0
               maximum: 100
         created_at:
@@ -386,10 +376,42 @@ components:
           format: date-time
           description: The creation date of the project
         parameters:
-          default: null
-          oneOf:
-            - type: 'null'
-            - $ref: '#/components/schemas/InferenceParameters'
+          type: object
+          required:
+            - inference
+            - polygons
+          properties:
+            inference:
+              default: null
+              oneOf:
+                - type: 'null'
+                - $ref: '#/components/schemas/InferenceParameters'
+        results:
+          type: object
+          required:
+            - inference
+            - polygons
+          properties:
+            inference:
+              default: null
+              oneOf:
+                - type: 'null'
+                  description: No inference image available
+                - type: string
+                  format: uri
+                  description: |-
+                    The (signed) URL to the inference results.
+                    Content type is `image/tiff; application=geotiff; cloud-optimized=true`.
+            polygons:
+              default: null
+              oneOf:
+                - type: 'null'
+                  description: No polygons available
+                - type: string
+                  format: uri
+                  description: |-
+                    The (signed) URL to the polygons.
+                    Content type is `application/geo+json`.
   securitySchemes:
     bearer:
       description: Bearer token
