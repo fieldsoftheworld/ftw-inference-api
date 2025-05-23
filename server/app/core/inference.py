@@ -18,11 +18,18 @@ inference_queue = []
 is_processing = False
 
 
-def run_inference_task(project_id: str, parameters: dict[str, Any]):
+def run_inference_task(
+    project_id: str, parameters: dict[str, Any], process_type: str = "inference"
+):
     """
     Add inference task to queue and start processing if not already running
+
+    Args:
+        project_id: The ID of the project
+        parameters: The parameters for the inference/polygonization
+        process_type: The type of processing, either "inference" or "polygonize"
     """
-    inference_queue.append((project_id, parameters))
+    inference_queue.append((project_id, parameters, process_type))
 
     # Start processing thread if not already running
     global is_processing
@@ -38,15 +45,22 @@ def process_queue():
     is_processing = True
 
     while inference_queue:
-        project_id, parameters = inference_queue.pop(0)
+        project_id, parameters, process_type = inference_queue.pop(0)
 
         # Get DB session
         db = SessionLocal()
         try:
-            # Process the inference
-            process_inference_queue(project_id, parameters, db)
+            # Process the inference or polygonization
+            if process_type == "inference":
+                process_inference_queue(project_id, parameters, db)
+            elif process_type == "polygonize":
+                process_polygonize_queue(project_id, parameters, db)
+            else:
+                raise ValueError(f"Unknown process type: {process_type}")
         except Exception as e:
-            logger.error(f"Error processing inference for project {project_id}: {e}")
+            logger.error(
+                f"Error processing {process_type} for project {project_id}: {e}"
+            )
             # Update project status to failed
             project = db.query(Project).filter(Project.id == project_id).first()
             if project:
@@ -261,6 +275,119 @@ def process_inference_queue(
         project.status = "failed"
         db.commit()
         raise
+
+
+def process_polygonize_queue(
+    project_id: str, parameters: dict[str, Any], db: Session
+) -> InferenceResult:
+    """
+    Process polygonization for a project, either on existing inference results
+    or by running inference first
+
+    Args:
+        project_id: The ID of the project to process
+        parameters: The parameters for the polygonization
+        db: The database session
+
+    Returns:
+        The created inference result
+    """
+    # Get project
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise ValueError(f"Project with ID {project_id} not found")
+
+    # Update project status
+    project.status = "running"
+    project.progress = 0
+    db.commit()
+
+    try:
+        # Create results directory if it doesn't exist
+        results_dir = Path("data/results") / project_id
+        results_dir.mkdir(exist_ok=True, parents=True)
+
+        # First check if we need to run inference or if we can use existing results
+        inference_result = (
+            db.query(InferenceResult)
+            .filter(
+                InferenceResult.project_id == project_id,
+                InferenceResult.result_type == "image",
+            )
+            .order_by(InferenceResult.created_at.desc())
+            .first()
+        )
+
+        # If no inference result exists, run inference first
+        if not inference_result:
+            logger.info(
+                f"No inference result found for project {project_id}, "
+                + "running inference first"
+            )
+            inference_result = process_inference_queue(project_id, parameters, db)
+
+        # Extract polygonization parameters
+        polygonize_params = parameters.get("polygonization", {})
+        if not polygonize_params:
+            # Use defaults from schema if not provided
+            polygonize_params = {
+                "simplify": 15,
+                "min_size": 500,
+                "close_interiors": False,
+            }
+
+        # Update progress
+        project.progress = 50
+        db.commit()
+
+        # Run polygonization on the inference result
+        logger.info(f"Running polygonization for project {project_id}")
+
+        # In a real implementation, you would call your polygonization function here
+        # For now, we'll create a mock GeoJSON result
+        output_path = results_dir / f"polygons_{int(time.time())}.geojson"
+
+        # Generate a simple mock GeoJSON
+        mock_geojson = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"id": 1},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+                    },
+                }
+            ],
+        }
+
+        # Write GeoJSON to file
+        with open(output_path, "w") as f:
+            json.dump(mock_geojson, f)
+
+        # Create new inference result record
+        geojson_result = InferenceResult(
+            project_id=project_id,
+            result_type="geojson",
+            file_path=str(output_path),
+            parameters=parameters,
+        )
+        db.add(geojson_result)
+
+        # Update project status
+        project.status = "completed"
+        project.progress = 100
+        db.commit()
+
+        return geojson_result
+
+    except Exception as e:
+        # Update project status to failed
+        project.status = "failed"
+        project.progress = None
+        db.commit()
+        raise e
 
 
 def download_images(project_id: str, image_urls: list) -> list:

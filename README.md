@@ -21,16 +21,9 @@ This project provides a FastAPI-based implementation of the Fields of the World 
    pip install -r server/requirements.txt
    ```
 
-3. Install the `ftw-tools` package (if available):
+3. For development only: Install development dependencies and set up pre-commit hooks:
    ```
-   pip install ftw-tools
-   ```
-
-   Note: If the `ftw-tools` package is not available, the API will run in mock mode for demonstration purposes.
-
-4. Set up pre-commit hooks (for development):
-   ```
-   pip install pre-commit
+   pip install -r server/requirements-dev.txt
    pre-commit install
    ```
 
@@ -71,11 +64,13 @@ python run.py --config /path/to/custom_config.yaml
 The API provides the following endpoints:
 
 - `GET /`: Root endpoint that returns basic API information
+- `PUT /example`: Compute field boundaries for a small area quickly and return as GeoJSON
 - `POST /projects`: Create a new project
 - `GET /projects`: List all projects
 - `GET /projects/{project_id}`: Get details of a specific project
 - `PUT /projects/{project_id}/images/{window}`: Upload an image for a project (window can be 'a' or 'b')
 - `PUT /projects/{project_id}/inference`: Run inference on project images
+- `PUT /projects/{project_id}/polygons`: Run polygonization on inference results
 - `GET /projects/{project_id}/inference`: Get inference results for a project
 
 ## Authentication
@@ -164,14 +159,6 @@ ruff format .
 Auto-fix issues:
 ```bash
 ruff check --fix .
-```
-
-#### Migration from older tools
-
-If you're migrating from older tools (black, isort, flake8), run the provided migration script:
-
-```bash
-python migrate-to-ruff.py
 ```
 
 ### Running Tests

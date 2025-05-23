@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import verify_auth
 from app.core.config import get_settings
-from app.core.inference import process_inference_queue, run_inference_task
+from app.core.inference import run_inference_task
 from app.db.database import get_db
 from app.models.project import Image, InferenceResult, Project
 from app.schemas.project import (
@@ -25,6 +25,13 @@ UPLOAD_DIR = Path("data/uploads")
 RESULTS_DIR = Path("data/results")
 
 router = APIRouter()
+
+
+def run(
+    inference_params: dict,
+    polygon_params: dict,
+):
+    pass
 
 
 @router.get("/", response_model=RootResponse)
@@ -44,6 +51,71 @@ async def get_root():
         "description": description,
         "models": settings.models,
     }
+
+
+@router.put("/example")
+async def get_example(
+    request_data: dict,
+    auth: dict = Depends(verify_auth),
+):
+    """
+    Compute polygons for a small area quickly
+    """
+    # Extract parameters
+    inference_params = request_data.get("inference", {})
+    polygon_params = request_data.get("polygons", {})
+
+    # Validate area size (example implementation, adjust based on your requirements)
+    if "bbox" in inference_params:
+        bbox = inference_params["bbox"]
+        # Calculate the area roughly
+        area_size = abs((bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
+        # ToDo: Set a threshold for "small area" (this is a placeholder value)
+        if area_size > 10:  # Adjust this threshold as needed
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Area too large for example endpoint. "
+                + "Please use the regular inference endpoints.",
+            )
+
+    # Process inference synchronously
+    try:
+        # This is a placeholder for the actual processing logic
+        # todo: In a real implementation, you would call your processing functions here
+        run(inference_params, polygon_params)
+
+        # Extract bbox with a default value
+        bbox = inference_params.get("bbox", [0, 0, 1, 1])
+
+        # Generate a simple GeoJSON response for demonstration
+        # ToDo: In a real implementation, this would be the result of your processing
+        geojson_response = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [bbox[0], bbox[1]],
+                                [bbox[2], bbox[1]],
+                                [bbox[2], bbox[3]],
+                                [bbox[0], bbox[3]],
+                                [bbox[0], bbox[1]],
+                            ]
+                        ],
+                    },
+                }
+            ],
+        }
+
+        return JSONResponse(content=geojson_response, media_type="application/geo+json")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from e
 
 
 @router.post(
@@ -173,54 +245,64 @@ async def run_inference(
         )
 
     # Update project with parameters
-    project.parameters = inference_params.model_dump()
+    project.parameters = {"inference": inference_params.model_dump()}
     db.commit()
 
-    # If queue is True, queue the inference task and return status 202
-    if inference_params.queue:
-        project.status = "queued"
-        project.progress = None
-        db.commit()
+    # Queue the inference task
+    project.status = "queued"
+    project.progress = None
+    db.commit()
 
-        # Start the inference task in the background
-        run_inference_task(project_id, inference_params.model_dump())
+    # Start the inference task in the background
+    run_inference_task(
+        project_id, inference_params.model_dump(), process_type="inference"
+    )
 
-        return JSONResponse(
-            status_code=status.HTTP_202_ACCEPTED,
-            content={"message": "Inference task queued for processing"},
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={"message": "Inference task queued for processing"},
+    )
+
+
+@router.put("/projects/{project_id}/polygons")
+async def polygonize(
+    project_id: str,
+    inference_params: InferenceParameters,
+    db: Session = Depends(get_db),
+    auth: dict = Depends(verify_auth),
+):
+    """
+    Run polygponization on project images or existing inference results
+    """
+    # Check if project exists
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found",
         )
-    else:
-        # Run inference synchronously and return results
-        try:
-            project.status = "running"
-            db.commit()
 
-            # Process inference
-            result = process_inference_queue(
-                project_id, inference_params.model_dump(), db
-            )
+    # Update project with parameters
+    project.parameters = {
+        "inference": inference_params.model_dump(),
+        "polygons": inference_params.polygonization.model_dump(),
+    }
+    db.commit()
 
-            # Return appropriate response based on result type
-            if result.result_type == "image":
-                return FileResponse(
-                    path=result.file_path,
-                    media_type="image/tiff",
-                    filename=f"inference_{project_id}.tif",
-                )
-            else:  # geojson
-                with open(result.file_path) as f:
-                    geojson_data = json.load(f)
+    # Queue the polygonization task
+    project.status = "queued"
+    project.progress = None
+    db.commit()
 
-                return JSONResponse(
-                    content=geojson_data, media_type="application/geo+json"
-                )
+    # Start the polygonization task in the background
+    run_inference_task(
+        project_id, inference_params.model_dump(), process_type="polygonize"
+    )
 
-        except Exception as e:
-            project.status = "failed"
-            db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-            ) from e
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={"message": "Polygonization task queued for processing"},
+    )
 
 
 @router.get("/projects/{project_id}/inference")

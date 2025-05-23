@@ -58,7 +58,7 @@ paths:
       summary: Compute polygons for a small area quickly
       operationId: getExample
       description: |-
-        This endpoint returns computed field boundaries over a small area and 
+        This endpoint returns computed field boundaries over a small area and
         returns them as polygons in GeoJSON format.
 
         Errors if the area is too large.
