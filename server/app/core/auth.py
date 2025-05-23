@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
 
-# OAuth2 scheme for bearer token
-security = HTTPBearer()
+# Create two security schemes:
+# 1. When auth is enabled: Required bearer token
+# 2. When auth is disabled: Optional bearer token
+security = HTTPBearer(auto_error=not get_settings().auth_disabled)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
@@ -46,7 +49,7 @@ def verify_token(token: str) -> dict:
 
 
 async def verify_auth(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> dict:
     """
     Dependency to verify JWT token from Authorization header
@@ -55,6 +58,15 @@ async def verify_auth(
     # Check if authentication is disabled in config
     if get_settings().auth_disabled:
         return {"sub": "guest_user"}
-
-    # Normal authentication flow
+        
+    # At this point, auth is enabled, and we should have credentials
+    # If not, it means auto_error=False, so we need to raise the error manually
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    # Normal authentication flow with token verification
     return verify_token(credentials.credentials)
