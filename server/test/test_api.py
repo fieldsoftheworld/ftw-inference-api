@@ -1,6 +1,11 @@
 import re
+from pathlib import Path
 
 DATETIME_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"
+
+# Define the same directories as the API
+UPLOAD_DIR = Path("data/uploads")
+RESULTS_DIR = Path("data/results")
 
 
 def test_root_endpoint(client):
@@ -27,12 +32,19 @@ def test_create_project(client):
     assert data["progress"] is None
     assert re.match(DATETIME_RE, data["created_at"])
 
+    # Clean up: delete the project
+    project_id = data["id"]
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204
+
 
 def test_get_projects(client):
     """Test getting a list of projects"""
-    # First create a project
-    client.post("/projects", json={"title": "Test Project 1"})
-    client.post("/projects", json={"title": "Test Project 2"})
+    # First create projects
+    response1 = client.post("/projects", json={"title": "Test Project 1"})
+    project_id1 = response1.json()["id"]
+    response2 = client.post("/projects", json={"title": "Test Project 2"})
+    project_id2 = response2.json()["id"]
 
     # Then get all projects
     response = client.get("/projects")
@@ -40,6 +52,12 @@ def test_get_projects(client):
     data = response.json()
     assert "projects" in data
     assert len(data["projects"]) >= 2
+
+    # Clean up: delete the projects
+    delete_response1 = client.delete(f"/projects/{project_id1}")
+    assert delete_response1.status_code == 204
+    delete_response2 = client.delete(f"/projects/{project_id2}")
+    assert delete_response2.status_code == 204
 
 
 def test_get_project(client):
@@ -58,10 +76,51 @@ def test_get_project(client):
     assert data["progress"] is None
     assert re.match(DATETIME_RE, data["created_at"])
 
+    # Clean up: delete the project
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204
+
 
 def test_get_nonexistent_project(client):
     """Test getting a non-existent project"""
     response = client.get("/projects/nonexistent")
+    assert response.status_code == 404
+
+
+def test_delete_project(client, tmp_path):
+    """Test deleting a project and verify directories are cleaned up"""
+    # First create a project
+    create_response = client.post("/projects", json={"title": "Project to Delete"})
+    assert create_response.status_code == 201
+    project_id = create_response.json()["id"]
+
+    # Verify the project exists
+    get_response = client.get(f"/projects/{project_id}")
+    assert get_response.status_code == 200
+    assert get_response.json()["title"] == "Project to Delete"
+
+    # Delete the project
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204
+
+    # Verify the project no longer exists in the database
+    get_response_after = client.get(f"/projects/{project_id}")
+    assert get_response_after.status_code == 404
+
+    # Verify the directories have been deleted
+    project_upload_dir = UPLOAD_DIR / project_id
+    project_results_dir = RESULTS_DIR / project_id
+    assert (
+        not project_upload_dir.exists()
+    ), f"Upload directory {project_upload_dir} should have been deleted"
+    assert (
+        not project_results_dir.exists()
+    ), f"Results directory {project_results_dir} should have been deleted"
+
+
+def test_delete_nonexistent_project(client):
+    """Test deleting a non-existent project"""
+    response = client.delete("/projects/nonexistent")
     assert response.status_code == 404
 
 
@@ -121,6 +180,10 @@ def test_upload_image_and_inference(client, tmp_path):
             # For file responses, we check the content-type and existence
             assert "image/" in response.headers.get("content-type", "")
 
+    # Clean up: delete the project
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204
+
 
 def test_inference_without_images(client):
     """Test running inference without uploading images"""
@@ -135,9 +198,7 @@ def test_inference_without_images(client):
         "patch_size": 1024,
         "padding": 64,
         "polygonization": {"simplify": 15, "min_size": 500, "close_interiors": False},
-    }
-
-    # Since we're mocking the HTTP requests in our implementation
+    }  # Since we're mocking the HTTP requests in our implementation
     # this should actually queue for processing
     response = client.put(f"/projects/{project_id}/inference", json=inference_params)
 
@@ -146,6 +207,10 @@ def test_inference_without_images(client):
     data = response.json()
     assert "message" in data
     assert "queued" in data["message"].lower()
+
+    # Clean up: delete the project
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204
 
 
 def test_get_inference_results_not_completed(client):
@@ -157,6 +222,10 @@ def test_get_inference_results_not_completed(client):
     # Try to get inference results
     response = client.get(f"/projects/{project_id}/inference")
     assert response.status_code == 400  # Bad request, inference not completed
+
+    # Clean up: delete the project
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204
 
 
 def test_example_endpoint(client):
@@ -237,9 +306,9 @@ def test_polygonize_endpoint(client, tmp_path):
         "padding": 32,
     }
 
-    response = client.put(f"/projects/{project_id}/inference", json=inference_params)
-
-    # Now run polygonization with custom parameters
+    response = client.put(
+        f"/projects/{project_id}/inference", json=inference_params
+    )  # Now run polygonization with custom parameters
     polygonize_params = {
         "bbox": [0, 1, 2, 3],
         "model": "default_model",
@@ -257,3 +326,7 @@ def test_polygonize_endpoint(client, tmp_path):
     data = response.json()
     assert "message" in data
     assert "queued" in data["message"].lower()
+
+    # Clean up: delete the project
+    delete_response = client.delete(f"/projects/{project_id}")
+    assert delete_response.status_code == 204

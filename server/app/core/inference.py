@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.project import InferenceResult, Project
 
-# Create logger
 logger = logging.getLogger(__name__)
 
 # Queue for storing inference tasks
@@ -165,47 +164,19 @@ def process_inference_queue(
 
             # Update progress
             project.progress = 80
-            db.commit()
-
-            # Handle polygonization if requested
-            if polygonize_opts:
-                # Extract polygonization options
-                simplify = polygonize_opts.get("simplify", 15)
-                min_size = polygonize_opts.get("min_size", 500)
-                close_interiors = polygonize_opts.get("close_interiors", False)
-
-                # Run polygonization
-                from ftw_tools import (
-                    polygonize,  # Import here to avoid dependency if not used
-                )
-
-                geojson_path = str(results_dir / f"{project_id}_polygons.geojson")
-                polygonize(
-                    input_path=result_path,
-                    output_path=geojson_path,
-                    simplify=simplify,
-                    min_size=min_size,
-                    close_interiors=close_interiors,
-                )
-
-                # Create inference result record for GeoJSON
-                result = InferenceResult(
-                    project_id=project_id,
-                    model_id=model_id,
-                    result_type="geojson",
-                    file_path=geojson_path,
-                )
-            else:
-                # Create inference result record for image
-                result = InferenceResult(
-                    project_id=project_id,
-                    model_id=model_id,
-                    result_type="image",
-                    file_path=result_path,
-                )
+            db.commit()  # Create inference result record for image
+            result = InferenceResult(
+                project_id=project_id,
+                model_id=model_id,
+                result_type="image",
+                file_path=result_path,
+            )
 
             # Add result to database
             db.add(result)
+
+            # Update project results field
+            project.results["inference"] = result_path
 
             # Update project status to completed
             project.status = "completed"
@@ -251,9 +222,7 @@ def process_inference_queue(
                 with open(result_path, "w") as f:
                     f.write("Mock TIF file")
 
-                result_type = "image"
-
-            # Create inference result record
+                result_type = "image"  # Create inference result record
             result = InferenceResult(
                 project_id=project_id,
                 model_id=model_id,
@@ -262,6 +231,9 @@ def process_inference_queue(
             )
 
             db.add(result)
+
+            # Update project results field
+            project.results["inference"] = result_path
 
             # Update project status to completed
             project.status = "completed"
@@ -364,9 +336,7 @@ def process_polygonize_queue(
 
         # Write GeoJSON to file
         with open(output_path, "w") as f:
-            json.dump(mock_geojson, f)
-
-        # Create new inference result record
+            json.dump(mock_geojson, f)  # Create new inference result record
         geojson_result = InferenceResult(
             project_id=project_id,
             result_type="geojson",
@@ -374,6 +344,9 @@ def process_polygonize_queue(
             parameters=parameters,
         )
         db.add(geojson_result)
+
+        # Update project results field
+        project.results["polygons"] = str(output_path)
 
         # Update project status
         project.status = "completed"

@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from app.core.inference import process_inference_queue
 from app.models.project import InferenceResult, Project
 
-# Create logger
 logger = logging.getLogger(__name__)
 
 
@@ -62,16 +61,6 @@ def process_polygonize_queue(
             )
             inference_result = process_inference_queue(project_id, parameters, db)
 
-        # Extract polygonization parameters
-        polygonize_params = parameters.get("polygonization", {})
-        if not polygonize_params:
-            # Use defaults from schema if not provided
-            polygonize_params = {
-                "simplify": 15,
-                "min_size": 500,
-                "close_interiors": False,
-            }
-
         # Update progress
         project.progress = 50
         db.commit()
@@ -87,6 +76,7 @@ def process_polygonize_queue(
             # Run the actual polygonization
             output_path = results_dir / f"polygons_{int(time.time())}.geojson"
 
+            # polygonize_params = parameters.get("polygons", {})
             # In a real implementation, you would call the actual function
             # with appropriate parameters
             #

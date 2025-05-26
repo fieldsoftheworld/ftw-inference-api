@@ -31,7 +31,12 @@ class Project(Base):
     status = Column(String, default=ProjectStatus.CREATED)
     progress = Column(Float, default=None, nullable=True)
     created_at = Column(PendulumDateTime, default=lambda: pendulum.now("UTC"))
-    parameters = Column(JSON, nullable=True)
+    parameters = Column(
+        JSON, nullable=False, default={"inference": None, "polygons": None}
+    )
+    results = Column(
+        JSON, nullable=False, default={"inference": None, "polygons": None}
+    )
 
     # Relationships
     images = relationship(

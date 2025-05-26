@@ -7,6 +7,9 @@ info:
   version: 0.1.0
 servers:
   - url: http://api.fieldsofthe.world
+    description: Production server
+  - url: http://localhost:8000
+    description: Local development server
 paths:
   /:
     get:
@@ -16,7 +19,7 @@ paths:
         This is the landing page of the API.
         It provides information about the server's capabilities and available endpoints.
       responses:
-        200:
+        '200':
           description: A JSON array of user names
           content:
             application/json:
@@ -122,7 +125,7 @@ paths:
       security:
         - bearer: []
       responses:
-        200:
+        '200':
           description: A list of projects for the authenticated user
           content:
             application/json:
@@ -134,6 +137,8 @@ paths:
                     items:
                       $ref: '#/components/schemas/Project'
   /projects/{project_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
     get:
       summary: Get project details
       operationId: getProject
@@ -141,20 +146,23 @@ paths:
         This endpoint returns the details of a specific project.
       security:
         - bearer: []
-      parameters:
-        - name: project_id
-          in: path
-          required: true
-          description: The id of the project to retrieve
-          schema:
-            type: string
       responses:
-        200:
+        '200':
           description: A JSON object with the project details
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
+    delete:
+      summary: Delete a project
+      operationId: deleteProject
+      description: |-
+        This endpoint deletes a specific project.
+      security:
+        - bearer: []
+      responses:
+        '204':
+          description: The project has been deleted.
   /projects/{project_id}/images/{window}:
     put:
       summary: Upload a raster image to a project
@@ -164,12 +172,7 @@ paths:
       security:
         - bearer: []
       parameters:
-        - name: project_id
-          in: path
-          required: true
-          description: The id of the project to upload the image to
-          schema:
-            type: string
+        - $ref: '#/components/parameters/project_id'
         - name: window
           in: path
           required: true
@@ -188,7 +191,7 @@ paths:
               format: binary
               description: The raster image to upload
       responses:
-        201:
+        '201':
           description: Upload succeeded.
         4XX:
           $ref: '#/components/responses/4XX'
@@ -202,6 +205,8 @@ paths:
         This endpoint takes raster images and starts processing.
       security:
         - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/project_id'
       requestBody:
         required: true
         content:
@@ -226,6 +231,8 @@ paths:
         i.e. re-runs polygonization with different parameters if desired.
       security:
         - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/project_id'
       requestBody:
         required: true
         content:
@@ -240,6 +247,14 @@ paths:
         5XX:
           $ref: '#/components/responses/5XX'
 components:
+  parameters:
+    project_id:
+      name: project_id
+      in: path
+      required: true
+      description: The ID of the project
+      schema:
+        type: string
   responses:
     4XX:
       description: Client error
@@ -259,7 +274,6 @@ components:
       required:
         - model
         - images
-        - polygonization
       properties:
         bbox:
           type: array
@@ -386,6 +400,11 @@ components:
               oneOf:
                 - type: 'null'
                 - $ref: '#/components/schemas/InferenceParameters'
+            polygons:
+              default: null
+              oneOf:
+                - type: 'null'
+                - $ref: '#/components/schemas/PolygonizationParameters'
         results:
           type: object
           required:

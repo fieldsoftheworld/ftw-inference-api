@@ -50,9 +50,33 @@ class InferenceParameters(BaseModel):
     padding: int = Field(
         64, description="Pixels to discard from each side of the patch"
     )
-    polygonization: PolygonizationParameters = Field(
-        default_factory=PolygonizationParameters,
-        description="Parameters for polygonization",
+
+
+class ProcessingParameters(BaseModel):
+    inference: InferenceParameters | None = Field(
+        default=None,
+        description="Parameters for running inference on the project",
+    )
+    polygons: PolygonizationParameters | None = Field(
+        default=None,
+        description="Parameters for polygonization of the inference results",
+    )
+
+    model_config = ConfigDict(
+        extra="ignore",  # Ignore additional fields
+    )
+
+
+class ProjectResults(BaseModel):
+    inference: str | None = Field(
+        default=None,
+        description="The (signed) URL to the inference results. "
+        + "Content type is image/tiff; application=geotiff; cloud-optimized=true.",
+    )
+    polygons: str | None = Field(
+        default=None,
+        description="The (signed) URL to the polygons. "
+        + "Content type is application/geo+json.",
     )
 
 
@@ -66,7 +90,14 @@ class ProjectResponse(BaseModel):
     status: ProjectStatus
     progress: float | None = None
     created_at: PendulumDateTime
-    parameters: InferenceParameters | None = None
+    parameters: ProcessingParameters = Field(
+        default_factory=ProcessingParameters,
+        description="Parameters for processing the project",
+    )
+    results: ProjectResults = Field(
+        default_factory=ProjectResults,
+        description="Results of inference and polygonization processing",
+    )
 
     model_config = ConfigDict(
         from_attributes=True,  # Replaces orm_mode=True

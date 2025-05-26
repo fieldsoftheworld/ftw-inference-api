@@ -14,6 +14,7 @@ from app.db.database import get_db
 from app.models.project import Image, InferenceResult, Project
 from app.schemas.project import (
     InferenceParameters,
+    PolygonizationParameters,
     ProjectCreate,
     ProjectResponse,
     ProjectsResponse,
@@ -167,6 +168,35 @@ async def get_project(
     return project
 
 
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project(
+    project_id: str, db: Session = Depends(get_db), auth: dict = Depends(verify_auth)
+):
+    """
+    Delete project
+    """
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found",
+        )
+
+    db.delete(project)
+
+    # Delete project directory if it exists
+    project_dir = UPLOAD_DIR / project_id
+    if project_dir.exists() and project_dir.is_dir():
+        shutil.rmtree(project_dir)
+    # Also delete results directory if it exists
+    results_dir = RESULTS_DIR / project_id
+    if results_dir.exists() and results_dir.is_dir():
+        shutil.rmtree(results_dir)
+
+    db.commit()
+
+
 @router.put(
     "/projects/{project_id}/images/{window}", status_code=status.HTTP_201_CREATED
 )
@@ -223,13 +253,11 @@ async def upload_image(
         db.add(new_image)
         db.commit()
 
-    return {"message": "Image uploaded successfully"}
-
 
 @router.put("/projects/{project_id}/inference")
-async def run_inference(
+async def inference(
     project_id: str,
-    inference_params: InferenceParameters,
+    params: InferenceParameters,
     db: Session = Depends(get_db),
     auth: dict = Depends(verify_auth),
 ):
@@ -244,18 +272,15 @@ async def run_inference(
             detail=f"Project with ID {project_id} not found",
         )
 
-    # Update project with parameters
-    project.parameters = {"inference": inference_params.model_dump()}
-    db.commit()
-
-    # Queue the inference task
+    # Update project with parameters (no workaround needed)
+    project.parameters["inference"] = params.model_dump()
     project.status = "queued"
     project.progress = None
     db.commit()
 
     # Start the inference task in the background
     run_inference_task(
-        project_id, inference_params.model_dump(), process_type="inference"
+        project_id, project.parameters["inference"], process_type="inference"
     )
 
     return JSONResponse(
@@ -267,7 +292,7 @@ async def run_inference(
 @router.put("/projects/{project_id}/polygons")
 async def polygonize(
     project_id: str,
-    inference_params: InferenceParameters,
+    params: PolygonizationParameters,
     db: Session = Depends(get_db),
     auth: dict = Depends(verify_auth),
 ):
@@ -282,21 +307,15 @@ async def polygonize(
             detail=f"Project with ID {project_id} not found",
         )
 
-    # Update project with parameters
-    project.parameters = {
-        "inference": inference_params.model_dump(),
-        "polygons": inference_params.polygonization.model_dump(),
-    }
-    db.commit()
-
-    # Queue the polygonization task
+    # Update project with parameters (no workaround needed)
+    project.parameters["polygons"] = params.model_dump()
     project.status = "queued"
     project.progress = None
     db.commit()
 
     # Start the polygonization task in the background
     run_inference_task(
-        project_id, inference_params.model_dump(), process_type="polygonize"
+        project_id, project.parameters["polygons"], process_type="polygonize"
     )
 
     return JSONResponse(

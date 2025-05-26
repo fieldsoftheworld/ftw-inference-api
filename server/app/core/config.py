@@ -1,3 +1,5 @@
+import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -5,6 +7,8 @@ from typing import Any
 import yaml
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -30,7 +34,7 @@ class Settings(BaseSettings):
     models: list[dict[str, Any]] = Field(default_factory=list)
 
     # Security
-    secret_key: str = "ftw_1234567890"
+    secret_key: str = "secret_key"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     auth_disabled: bool = False  # Option to disable authentication
@@ -77,9 +81,12 @@ def get_settings() -> Settings:
     """
     settings = Settings()
 
-    # Load configuration from default config file
-    config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
-    if config_path.exists():
-        settings.load_from_yaml(config_path)
+    config_path = os.environ.get("CONFIG_FILE", "config/config.yaml")
+    p = Path(config_path)
+    if p.exists():
+        logger.info("Loading config from:" + str(p.absolute()))
+        settings.load_from_yaml(p)
+    else:
+        logger.warning(f"Config file {p.absolute()} does not exist, using defaults.")
 
     return settings

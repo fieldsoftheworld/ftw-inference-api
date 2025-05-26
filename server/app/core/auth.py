@@ -14,29 +14,35 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     """
     Create a JWT access token
     """
+    settings = get_settings()
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(
-            minutes=get_settings().access_token_expire_minutes
+            minutes=settings.access_token_expire_minutes
         )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        to_encode, get_settings().secret_key, algorithm=get_settings().algorithm
+        to_encode, settings.secret_key, algorithm=settings.algorithm
     )
+    # todo: store token in database
     return encoded_jwt
 
 
-def verify_token(token: str) -> dict:
+async def verify_auth(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
     """
     Verify a JWT token and return the payload
     """
+    settings = get_settings()
     try:
         payload = jwt.decode(
-            token, get_settings().secret_key, algorithms=[get_settings().algorithm]
+            credentials.credentials,
+            settings.secret_key,
+            algorithms=[settings.algorithm],
         )
-        return payload
     except JWTError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -44,17 +50,19 @@ def verify_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         ) from err
 
+    if settings.auth_disabled:
+        if payload.get("sub") != "guest":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication is disabled, but token is not for guest user",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    else:
+        # todo: check against database
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Authentication is not implemented yet",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-async def verify_auth(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict:
-    """
-    Dependency to verify JWT token from Authorization header
-    If authentication is disabled in config, returns a default user without verification
-    """
-    # Check if authentication is disabled in config
-    if get_settings().auth_disabled:
-        return {"sub": "guest_user"}
-
-    # Normal authentication flow
-    return verify_token(credentials.credentials)
+    return payload
