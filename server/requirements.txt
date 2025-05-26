@@ -12,3 +12,4 @@ pytest-cov>=4.1.0
 httpx>=0.24.0
 ftw-tools>=1.1.1
 pendulum>=3.0.0
+torchgeo==0.6.2 # for ftw-tools until fixed in ftw-tools

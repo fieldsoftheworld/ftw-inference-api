@@ -9,12 +9,18 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import verify_auth
 from app.core.config import get_settings
-from app.core.inference import run_inference_task
+from app.core.inference import run_task
+from app.core.processing import (
+    prepare_inference_params,
+    prepare_polygon_params,
+    run_example,
+)
 from app.db.database import get_db
 from app.models.project import Image, InferenceResult, Project
 from app.schemas.project import (
     InferenceParameters,
     PolygonizationParameters,
+    ProcessingParameters,
     ProjectCreate,
     ProjectResponse,
     ProjectsResponse,
@@ -26,13 +32,6 @@ UPLOAD_DIR = Path("data/uploads")
 RESULTS_DIR = Path("data/results")
 
 router = APIRouter()
-
-
-def run(
-    inference_params: dict,
-    polygon_params: dict,
-):
-    pass
 
 
 @router.get("/", response_model=RootResponse)
@@ -55,63 +54,42 @@ async def get_root():
 
 
 @router.put("/example")
-async def get_example(
-    request_data: dict,
+async def example(
+    params: ProcessingParameters,
     auth: dict = Depends(verify_auth),
 ):
     """
     Compute polygons for a small area quickly
     """
-    # Extract parameters
-    inference_params = request_data.get("inference", {})
-    polygon_params = request_data.get("polygons", {})
+    # Get settings to access max area configuration
+    settings = get_settings()
 
-    # Validate area size (example implementation, adjust based on your requirements)
-    if "bbox" in inference_params:
-        bbox = inference_params["bbox"]
-        # Calculate the area roughly
-        area_size = abs((bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
-        # ToDo: Set a threshold for "small area" (this is a placeholder value)
-        if area_size > 10:  # Adjust this threshold as needed
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Area too large for example endpoint. "
-                + "Please use the regular inference endpoints.",
-            )
+    if params.inference is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inference parameters are required",
+        )
+
+    # Validate parameters
+    try:
+        inference_params = prepare_inference_params(
+            params.inference.model_dump(),
+            require_bbox=True,
+            require_image_urls=True,
+            max_area=settings.max_area_km2,
+        )
+        polygon_params = prepare_polygon_params(
+            params.polygons.model_dump() if params.polygons else {}
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
 
     # Process inference synchronously
     try:
-        # This is a placeholder for the actual processing logic
-        # todo: In a real implementation, you would call your processing functions here
-        run(inference_params, polygon_params)
-
-        # Extract bbox with a default value
-        bbox = inference_params.get("bbox", [0, 0, 1, 1])
-
-        # Generate a simple GeoJSON response for demonstration
-        # ToDo: In a real implementation, this would be the result of your processing
-        geojson_response = {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "properties": {},
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [
-                            [
-                                [bbox[0], bbox[1]],
-                                [bbox[2], bbox[1]],
-                                [bbox[2], bbox[3]],
-                                [bbox[0], bbox[3]],
-                                [bbox[0], bbox[1]],
-                            ]
-                        ],
-                    },
-                }
-            ],
-        }
-
+        geojson_response = run_example(inference_params, polygon_params)
         return JSONResponse(content=geojson_response, media_type="application/geo+json")
     except Exception as e:
         raise HTTPException(
@@ -272,16 +250,23 @@ async def inference(
             detail=f"Project with ID {project_id} not found",
         )
 
+    # Validate parameters
+    try:
+        inference_params = prepare_inference_params(params.model_dump())
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
     # Update project with parameters (no workaround needed)
-    project.parameters["inference"] = params.model_dump()
+    project.parameters["inference"] = inference_params
     project.status = "queued"
     project.progress = None
     db.commit()
 
     # Start the inference task in the background
-    run_inference_task(
-        project_id, project.parameters["inference"], process_type="inference"
-    )
+    run_task(project_id, inference_params, process_type="inference")
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
@@ -307,16 +292,23 @@ async def polygonize(
             detail=f"Project with ID {project_id} not found",
         )
 
+    # Validate parameters
+    try:
+        polygon_params = prepare_polygon_params(params.model_dump())
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
     # Update project with parameters (no workaround needed)
-    project.parameters["polygons"] = params.model_dump()
+    project.parameters["polygons"] = polygon_params
     project.status = "queued"
     project.progress = None
     db.commit()
 
     # Start the polygonization task in the background
-    run_inference_task(
-        project_id, project.parameters["polygons"], process_type="polygonize"
-    )
+    run_task(project_id, polygon_params, process_type="polygonize")
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,

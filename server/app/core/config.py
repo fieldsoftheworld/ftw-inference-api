@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # Maximum area in square kilometers for the example endpoint
+    max_area_km2: float = 1000.0
+
     # Database settings
     database_url: str = "sqlite:///./data/ftw_inference.db"
 
@@ -71,6 +74,9 @@ class Settings(BaseSettings):
             "access_token_expire_minutes", self.access_token_expire_minutes
         )
         self.auth_disabled = security_config.get("auth_disabled", self.auth_disabled)
+
+        proc_config = config.get("processing", {})
+        self.max_area_km2 = proc_config.get("max_area_km2", self.max_area_km2)
 
 
 @lru_cache

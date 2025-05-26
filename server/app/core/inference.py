@@ -17,7 +17,7 @@ inference_queue = []
 is_processing = False
 
 
-def run_inference_task(
+def run_task(
     project_id: str, parameters: dict[str, Any], process_type: str = "inference"
 ):
     """
@@ -103,7 +103,7 @@ def process_inference_queue(
         settings = get_settings()
 
         model_config = next(
-            (model for model in settings.models_config if model.get("id") == model_id),
+            (model for model in settings.models if model.get("id") == model_id),
             None,
         )
         if not model_config:
@@ -115,7 +115,9 @@ def process_inference_queue(
             raise ValueError(f"Model file not specified for model {model_id}")
 
         # Construct the full path to the model file
-        model_path = Path(__file__).parent.parent / "data" / "models" / model_file
+        model_path = (
+            Path(__file__).parent.parent.parent / "data" / "models" / model_file
+        )
         if not model_path.exists():
             raise ValueError(f"Model file not found at {model_path}")
 
@@ -149,7 +151,7 @@ def process_inference_queue(
 
             # Extract other parameters
             resize_factor = parameters.get("resize_factor", 2)
-            patch_size = parameters.get("patch_size", 1024)
+            patch_size = parameters.get("patch_size")
             padding = parameters.get("padding", 64)
 
             # Run inference

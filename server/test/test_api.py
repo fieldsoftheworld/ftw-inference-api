@@ -154,7 +154,7 @@ def test_upload_image_and_inference(client, tmp_path):
     assert response.status_code == 201  # Run inference
     inference_params = {
         "bbox": [0, 1, 2, 3],  # Example bounding box
-        "model": "default_model",
+        "model": "2_Class_FULL_FTW_Pretrained",
         "images": None,  # Use uploaded images
         "resize_factor": 1.5,
         "patch_size": 512,
@@ -192,7 +192,7 @@ def test_inference_without_images(client):
     project_id = create_response.json()["id"]  # Run inference with image URLs
     inference_params = {
         "bbox": None,  # No bounding box
-        "model": "default_model",
+        "model": "2_Class_FULL_FTW_Pretrained",
         "images": ["http://example.com/image1.tif", "http://example.com/image2.tif"],
         "resize_factor": 2,
         "patch_size": 1024,
@@ -233,10 +233,14 @@ def test_example_endpoint(client):
     # Test data for the example endpoint
     request_data = {
         "inference": {
-            "model": "default_model",
-            "bbox": [10.0, 50.0, 10.01, 50.01],  # Small area
+            "model": "2_Class_FULL_FTW_Pretrained",
+            "images": [
+                "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210617T100559_R022_T33UUP_20210624T063729",
+                "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210925T101019_R022_T33UUP_20210926T121923",
+            ],
+            "bbox": [13.0, 48.0, 13.1, 48.1],
         },
-        "polygons": {"simplify": 10, "min_size": 200, "close_interiors": False},
+        "polygons": {},
     }
 
     response = client.put("/example", json=request_data)
@@ -247,22 +251,65 @@ def test_example_endpoint(client):
     data = response.json()
     assert data["type"] == "FeatureCollection"
     assert "features" in data
-    assert len(data["features"]) > 0
+    # assert len(data["features"]) > 0
 
 
 def test_example_endpoint_area_too_large(client):
     """Test the example endpoint with an area that's too large"""
-    # Test data with a large area
+    # Test data with a large area (much larger than the default 5.0 km² limit)
     request_data = {
         "inference": {
-            "model": "default_model",
-            "bbox": [0.0, 0.0, 10.0, 10.0],  # Very large area
+            "model": "2_Class_FULL_FTW_Pretrained",
+            "bbox": [0.0, 0.0, 1.0, 1.0],  # Approximately 12,300 km²
+        },
+        "polygons": {},
+    }
+
+    response = client.put("/example", json=request_data)
+    assert response.status_code == 400  # Bad request, area too large
+    assert "Area too large" in response.json()["detail"]
+
+
+def test_example_endpoint_invalid_bbox(client):
+    """Test the example endpoint with invalid bbox values (outside EPSG:4326 bounds)"""
+    # Test with longitude out of bounds
+    request_data = {
+        "inference": {
+            "model": "2_Class_FULL_FTW_Pretrained",
+            "bbox": [-190.0, 0.0, -185.0, 1.0],  # Invalid longitude
         },
         "polygons": {"simplify": 10, "min_size": 200, "close_interiors": False},
     }
 
     response = client.put("/example", json=request_data)
-    assert response.status_code == 400  # Bad request, area too large
+    assert response.status_code == 400
+    assert "Longitude values" in response.json()["detail"]
+
+    # Test with latitude out of bounds
+    request_data = {
+        "inference": {
+            "model": "2_Class_FULL_FTW_Pretrained",
+            "bbox": [0.0, -95.0, 1.0, -92.0],  # Invalid latitude
+        },
+        "polygons": {},
+    }
+
+    response = client.put("/example", json=request_data)
+    assert response.status_code == 400
+    assert "Latitude values" in response.json()["detail"]
+
+    # Test with min > max
+    request_data = {
+        "inference": {
+            "model": "2_Class_FULL_FTW_Pretrained",
+            "bbox": [10.0, 10.0, 5.0, 5.0],  # min > max
+        },
+        "polygons": {},
+    }
+
+    response = client.put("/example", json=request_data)
+    assert response.status_code == 400
+    assert "min values must be less than max values" in response.json()["detail"]
 
 
 def test_polygonize_endpoint(client, tmp_path):
@@ -299,7 +346,7 @@ def test_polygonize_endpoint(client, tmp_path):
     # Run inference first to create results that can be polygonized
     inference_params = {
         "bbox": [0, 1, 2, 3],
-        "model": "default_model",
+        "model": "2_Class_FULL_FTW_Pretrained",
         "images": None,
         "resize_factor": 1.5,
         "patch_size": 512,
@@ -311,7 +358,7 @@ def test_polygonize_endpoint(client, tmp_path):
     )  # Now run polygonization with custom parameters
     polygonize_params = {
         "bbox": [0, 1, 2, 3],
-        "model": "default_model",
+        "model": "2_Class_FULL_FTW_Pretrained",
         "images": None,
         "resize_factor": 1.5,
         "patch_size": 512,

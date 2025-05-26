@@ -45,3 +45,6 @@ models:
     license: CC-BY-4.0
     version: v1
     file: 3_Class_CCBY_FTW_Pretrained.ckpt
+
+processing:
+  max_area_km2: 300.0  # Maximum area in square kilometers for examples

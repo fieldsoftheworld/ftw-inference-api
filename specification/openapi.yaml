@@ -81,6 +81,24 @@ paths:
                   $ref: '#/components/schemas/InferenceParameters'
                 polygons:
                   $ref: '#/components/schemas/PolygonizationParameters'
+              example:
+                inference:
+                  model: 3_Class_FULL_FTW_Pretrained
+                  images:
+                  - https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210617T100559_R022_T33UUP_20210624T063729
+                  - https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210925T101019_R022_T33UUP_20210926T121923
+                  bbox:
+                    - 13
+                    - 48
+                    - 13.1
+                    - 48.1
+                  resize_factor: 2
+                  patch_size: 1024
+                  padding: 64
+                polygons:
+                  simplify: 15
+                  min_size: 150
+                  close_interiors: true
       responses:
         '200':
           description: The GeoJSON with the polygons after polygponization.
@@ -280,7 +298,7 @@ components:
           description: |-
             The bounding box of the area to run inference on.
             The coordinates are in the order [minX, minY, maxX, maxY].
-            The coordinates are in the coordinate reference system (CRS) of the images.
+            The coordinates are provided in EPSG:4326.
             If not provided, the bounding box will be calculated from the images.
           items:
             type: number
@@ -309,11 +327,14 @@ components:
             Resize factor to use for inference.
           default: 2
         patch_size:
-          type: integer
-          description: |-
-            Size of patch to use for inference.
-            Defaults to 1024 unless the image is < 1024x1024px.
-          default: 1024
+          default: null
+          oneOf:
+            - type: 'null'
+              description: |-
+                No patch size provided, will determine reasonable default based on the image size.
+            - type: integer
+              description: |-
+                Size of patch to use for inference, should be a power of 2.
         padding:
           type: integer
           description: |-
