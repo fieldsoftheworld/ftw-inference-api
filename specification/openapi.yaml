@@ -106,6 +106,9 @@ paths:
             application/geo+json:
               schema:
                 $ref: 'https://geojson.org/schema/FeatureCollection.json'
+            application/x-ndjson:
+              schema:
+                type: string
         4XX:
           $ref: '#/components/responses/4XX'
         5XX:
@@ -451,7 +454,7 @@ components:
                   format: uri
                   description: |-
                     The (signed) URL to the polygons.
-                    Content type is `application/geo+json`.
+                    Content type is `application/geo+json` or `application/x-ndjson`.
   securitySchemes:
     bearer:
       description: Bearer token
