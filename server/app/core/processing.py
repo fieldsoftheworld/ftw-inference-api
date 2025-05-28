@@ -104,14 +104,14 @@ def prepare_polygon_params(params):
     return params
 
 
-def run_example(inference_params, polygon_params):
+def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
     """
     Run the example inference with the provided parameters.
     """
     uid = str(uuid.uuid4())
     image_file = TEMP_DIR / (uid + ".tif")
     inference_file = TEMP_DIR / (uid + ".inference.tif")
-    polygon_file = TEMP_DIR / (uid + ".json")
+    polygon_file = TEMP_DIR / (uid + ".ndjson" if ndjson else ".json")
 
     # Download and combine imagery
     # ftw inference download --out {output_path}
@@ -151,11 +151,12 @@ def run_example(inference_params, polygon_params):
         str(inference_params["resize_factor"]),
         "--padding",
         str(inference_params["padding"]),
-        # "--gpu", "0"
     ]
     patch_size = inference_params.get("patch_size")
     if patch_size is not None:
         inference_cmd.extend(["--patch_size", str(patch_size)])
+    if gpu is not None:
+        inference_cmd.extend(["--gpu", str(gpu)])
 
     run(inference_cmd)
 
@@ -181,7 +182,10 @@ def run_example(inference_params, polygon_params):
 
     # Read the resulting GeoJSON and return it
     with open(polygon_file) as f:
-        data = json.load(f)
+        if ndjson:
+            data = f.read()
+        else:
+            data = json.load(f)
 
     image_file.unlink(missing_ok=True)
     inference_file.unlink(missing_ok=True)
@@ -192,6 +196,9 @@ def run_example(inference_params, polygon_params):
 
 def run(cmd):
     # print(" ".join(cmd))
+    # import time
+    # start = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # True
-    # print(result)
+    # elapsed_time = time.perf_counter() - start
+    # print(f"Elapsed time: {elapsed_time:.4f} seconds")
     return result

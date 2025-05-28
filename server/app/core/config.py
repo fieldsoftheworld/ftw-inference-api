@@ -2,7 +2,7 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 from pydantic import Field
@@ -26,6 +26,8 @@ class Settings(BaseSettings):
 
     # Maximum area in square kilometers for the example endpoint
     max_area_km2: float = 1000.0
+    # GPU/CPU usage: None (CPU) or GPU index (e.g., 0 for the first GPU)
+    gpu: Optional[int] = None
 
     # Database settings
     database_url: str = "sqlite:///./data/ftw_inference.db"
@@ -77,6 +79,7 @@ class Settings(BaseSettings):
 
         proc_config = config.get("processing", {})
         self.max_area_km2 = proc_config.get("max_area_km2", self.max_area_km2)
+        self.gpu = proc_config.get("gpu", self.gpu)
 
 
 @lru_cache

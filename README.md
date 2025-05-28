@@ -68,6 +68,7 @@ The API provides the following endpoints:
 - `POST /projects`: Create a new project
 - `GET /projects`: List all projects
 - `GET /projects/{project_id}`: Get details of a specific project
+- `DELETE /projects/{project_id}`: Delete a specific project
 - `PUT /projects/{project_id}/images/{window}`: Upload an image for a project (window can be 'a' or 'b')
 - `PUT /projects/{project_id}/inference`: Run inference on project images
 - `PUT /projects/{project_id}/polygons`: Run polygonization on inference results
@@ -81,7 +82,13 @@ The API uses Bearer token authentication. Include the `Authorization` header wit
 Authorization: Bearer <your_token_here>
 ```
 
-For development and testing, you can disable authentication by editing the `app/core/auth.py` file.
+For development and testing, you can disable authentication by setting `auth_disabled` to `true` in `config/config.yaml`.
+
+You still need to send a Bearer token to the API, but you can define a token via jwt.io for example.
+The important part is that the secret key in config and in the config file align.
+You also need to set the `sub` to `guest`.
+For the default config, the following token can be used:
+`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJndWVzdCIsIm5hbWUiOiJHdWVzdCIsImlhdCI6MTc0ODIxNzYwMCwiZXhwaXJlcyI6OTk5OTk5OTk5OX0.lJIkuuSdE7ihufZwWtLx10D_93ygWUcUrtKhvlh6M8k`
 
 ## Development
 

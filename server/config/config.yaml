@@ -47,4 +47,5 @@ models:
     file: 3_Class_CCBY_FTW_Pretrained.ckpt
 
 processing:
-  max_area_km2: 300.0  # Maximum area in square kilometers for examples
+  max_area_km2: 500.0  # Maximum area in square kilometers for examples
+  gpu: null # null (CPU) or GPU index (e.g., 0 for the first GPU)

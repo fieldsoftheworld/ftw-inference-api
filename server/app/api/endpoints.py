@@ -3,9 +3,10 @@ import os
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.core.auth import verify_auth
 from app.core.config import get_settings
@@ -49,6 +50,7 @@ async def get_root():
         "api_version": settings.api_version,
         "title": title,
         "description": description,
+        "max_area_km2": settings.max_area_km2,
         "models": settings.models,
     }
 
@@ -57,6 +59,7 @@ async def get_root():
 async def example(
     params: ProcessingParameters,
     auth: dict = Depends(verify_auth),
+    accept: Optional[str] = Header(None),
 ):
     """
     Compute polygons for a small area quickly
@@ -70,13 +73,15 @@ async def example(
             detail="Inference parameters are required",
         )
 
+    ndjson = accept and "application/x-ndjson" in accept
+
     # Validate parameters
     try:
         inference_params = prepare_inference_params(
             params.inference.model_dump(),
             require_bbox=True,
             require_image_urls=True,
-            max_area=settings.max_area_km2,
+            max_area=settings.max_area_km2
         )
         polygon_params = prepare_polygon_params(
             params.polygons.model_dump() if params.polygons else {}
@@ -89,8 +94,22 @@ async def example(
 
     # Process inference synchronously
     try:
-        geojson_response = run_example(inference_params, polygon_params)
-        return JSONResponse(content=geojson_response, media_type="application/geo+json")
+        response = run_example(
+            inference_params,
+            polygon_params,
+            ndjson=ndjson,
+            gpu=settings.gpu
+        )
+        if ndjson:
+            return PlainTextResponse(
+                content=response,
+                media_type="application/x-ndjson",
+            )
+        else:
+            return JSONResponse(
+                content=response,
+                media_type="application/geo+json",
+            )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)

@@ -131,4 +131,5 @@ class RootResponse(BaseModel):
     api_version: str
     title: str
     description: str
+    max_area_km2: float
     models: list[ModelInfo]
