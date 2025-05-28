@@ -1,3 +1,4 @@
+import asyncio
 import json
 import subprocess
 import uuid
@@ -89,8 +90,8 @@ def prepare_inference_params(
         raise ValueError("Resize factor must be a positive number")
 
     # CHECK PADDING
-    if params.get("padding") <= 0:
-        raise ValueError("Padding must be a positive integer")
+    if params.get("padding") < 0:
+        raise ValueError("Padding must be a positive integer or 0")
 
     # CHECK PATCH SIZE
     patch_size = params.get("patch_size")
@@ -104,7 +105,7 @@ def prepare_polygon_params(params):
     return params
 
 
-def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
+async def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
     """
     Run the example inference with the provided parameters.
     """
@@ -132,7 +133,7 @@ def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
         "--bbox",
         bbox,
     ]
-    run(download_cmd)
+    await run_async(download_cmd)
 
     # ftw inference run {input} --out {output_path}
     #   --model {model} --resize_factor {resize}
@@ -158,7 +159,7 @@ def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
     if gpu is not None:
         inference_cmd.extend(["--gpu", str(gpu)])
 
-    run(inference_cmd)
+    await run_async(inference_cmd)
 
     # ftw inference polygonize {input} --out {output_path}
     #   --simplify {simplify} --min_size {min_size} --close_interiors
@@ -178,7 +179,7 @@ def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
     if polygon_params["close_interiors"]:
         polygonize_cmd.append("--close_interiors")
 
-    run(polygonize_cmd)
+    await run_async(polygonize_cmd)
 
     # Read the resulting GeoJSON and return it
     with open(polygon_file) as f:
@@ -193,12 +194,22 @@ def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
 
     return data
 
-
-def run(cmd):
+async def run_async(cmd):
+    """Run subprocess command asynchronously"""
     # print(" ".join(cmd))
     # import time
     # start = time.perf_counter()
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # True
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+
     # elapsed_time = time.perf_counter() - start
     # print(f"Elapsed time: {elapsed_time:.4f} seconds")
-    return result
+    
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+    
+    return process

@@ -3,7 +3,7 @@ import os
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -94,7 +94,7 @@ async def example(
 
     # Process inference synchronously
     try:
-        response = run_example(
+        response = await run_example(
             inference_params,
             polygon_params,
             ndjson=ndjson,
