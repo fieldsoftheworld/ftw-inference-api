@@ -96,8 +96,8 @@ paths:
                     - 13.1
                     - 48.1
                   resize_factor: 2
-                  patch_size: 1024
-                  padding: 64
+                  patch_size: 256
+                  padding: 16
                 polygons:
                   simplify: 15
                   min_size: 150
@@ -345,7 +345,7 @@ components:
           type: integer
           description: |-
             Pixels to discard from each side of the patch.
-          default: 64
+          default: 0
     PolygonizationParameters:
       type: object
       description: Polygonization parameters

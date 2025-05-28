@@ -46,9 +46,9 @@ class InferenceParameters(BaseModel):
         + "(window A and B) to run inference on",
     )
     resize_factor: float = Field(2, description="Resize factor to use for inference")
-    patch_size: int = Field(1024, description="Size of patch to use for inference")
+    patch_size: int | None = Field(None, description="Size of patch to use for inference")
     padding: int = Field(
-        64, description="Pixels to discard from each side of the patch"
+        0, description="Pixels to discard from each side of the patch"
     )
 
 

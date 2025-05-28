@@ -152,7 +152,7 @@ def process_inference_queue(
             # Extract other parameters
             resize_factor = parameters.get("resize_factor", 2)
             patch_size = parameters.get("patch_size")
-            padding = parameters.get("padding", 64)
+            padding = parameters.get("padding", 0)
 
             # Run inference
             result_path = run_inference(
