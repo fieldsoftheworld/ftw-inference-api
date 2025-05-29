@@ -16,7 +16,6 @@ jobs:
           # - macos-latest # ignore for now
           # - windows-latest # ignore for now
         python-version:
-          - '3.10'
           - '3.11'
           - '3.12'
           # - '3.13' # doesn't work yet
@@ -33,6 +32,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r server/requirements.txt
         pip install pytest pytest-cov pre-commit
+
+    - name: Download model(s)
+      run: |
+        curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
 
     - name: Lint and format check with pre-commit
       uses: pre-commit/action@v3.0.0

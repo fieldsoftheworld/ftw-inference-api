@@ -4,9 +4,8 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 
 ## Requirements
 
-- Python 3.10 or higher
+- Python 3.11 or 3.12
 - All dependencies listed in `server/requirements.txt`
-- The `ftw-tools` package (if running actual inference)
 
 ## Installation
 

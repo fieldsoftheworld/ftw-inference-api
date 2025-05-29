@@ -105,7 +105,7 @@ def prepare_polygon_params(params):
     return params
 
 
-async def run_example(inference_params, polygon_params, ndjson = False, gpu = None):
+async def run_example(inference_params, polygon_params, ndjson=False, gpu=None):
     """
     Run the example inference with the provided parameters.
     """
@@ -183,10 +183,7 @@ async def run_example(inference_params, polygon_params, ndjson = False, gpu = No
 
     # Read the resulting GeoJSON and return it
     with open(polygon_file) as f:
-        if ndjson:
-            data = f.read()
-        else:
-            data = json.load(f)
+        data = f.read() if ndjson else json.load(f)
 
     image_file.unlink(missing_ok=True)
     inference_file.unlink(missing_ok=True)
@@ -194,22 +191,21 @@ async def run_example(inference_params, polygon_params, ndjson = False, gpu = No
 
     return data
 
+
 async def run_async(cmd):
     """Run subprocess command asynchronously"""
     # print(" ".join(cmd))
     # import time
     # start = time.perf_counter()
     process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     stdout, stderr = await process.communicate()
 
     # elapsed_time = time.perf_counter() - start
     # print(f"Elapsed time: {elapsed_time:.4f} seconds")
-    
+
     if process.returncode != 0:
         raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
-    
+
     return process

@@ -3,10 +3,17 @@ import os
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.core.auth import verify_auth
 from app.core.config import get_settings
@@ -59,7 +66,7 @@ async def get_root():
 async def example(
     params: ProcessingParameters,
     auth: dict = Depends(verify_auth),
-    accept: Optional[str] = Header(None),
+    accept: str | None = Header(None),
 ):
     """
     Compute polygons for a small area quickly
@@ -81,7 +88,7 @@ async def example(
             params.inference.model_dump(),
             require_bbox=True,
             require_image_urls=True,
-            max_area=settings.max_area_km2
+            max_area=settings.max_area_km2,
         )
         polygon_params = prepare_polygon_params(
             params.polygons.model_dump() if params.polygons else {}
@@ -95,10 +102,7 @@ async def example(
     # Process inference synchronously
     try:
         response = await run_example(
-            inference_params,
-            polygon_params,
-            ndjson=ndjson,
-            gpu=settings.gpu
+            inference_params, polygon_params, ndjson=ndjson, gpu=settings.gpu
         )
         if ndjson:
             return PlainTextResponse(

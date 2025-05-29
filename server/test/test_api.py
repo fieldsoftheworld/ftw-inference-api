@@ -238,7 +238,7 @@ def test_example_endpoint(client):
                 "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210617T100559_R022_T33UUP_20210624T063729",
                 "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210925T101019_R022_T33UUP_20210926T121923",
             ],
-            "bbox": [13.0, 48.0, 13.1, 48.1],
+            "bbox": [13.0, 48.0, 13.05, 48.05],
         },
         "polygons": {},
     }
