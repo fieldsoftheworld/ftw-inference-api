@@ -5,6 +5,8 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 ## Requirements
 
 - Python 3.11 or 3.12
+- Install GDAL 3.11 or later
+- Install `libgdal-arrow-parquet`
 - All dependencies listed in `server/requirements.txt`
 
 ## Installation
