@@ -11,30 +11,59 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 
 ## Installation
 
+### Quick EC2 Deployment
+
+For deployment on EC2 Ubuntu instances (especially with Deep Learning AMI):
+
 1. Clone the repository:
-   ```
+   ```bash
    git clone https://github.com/yourusername/ftw-inference-api.git
    cd ftw-inference-api
    ```
 
-2. Install dependencies:
-   ```
-   pip install -r server/requirements.txt
+2. Run the deployment script:
+   ```bash
+   ./deploy.sh
    ```
 
-3. For development only: Install development dependencies and set up pre-commit hooks:
+This script will:
+- Install system dependencies (GDAL, etc.)
+- Install UV (fast Python package manager)
+- Install all Python dependencies
+- Set up the project structure
+
+### Manual Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/ftw-inference-api.git
+   cd ftw-inference-api
    ```
-   pip install -r server/requirements-dev.txt
+
+2. Install system dependencies:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install gdal-bin libgdal-dev libgdal-arrow-parquet-dev python3-gdal
+   ```
+
+3. Install UV and dependencies:
+   ```bash
+   curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh | sh
+   uv sync
+   ```
+
+4. For development only: Install development dependencies:
+   ```bash
+   uv sync --extra dev
    pre-commit install
    ```
 
 ## Running the Server
 
-You can run the server using the provided `run.py` script in the server directory:
+You can run the server using the provided `run.py` script:
 
 ```bash
-cd server
-python run.py
+./run.py
 ```
 
 ### Command-line Options
@@ -47,7 +76,7 @@ python run.py
 Example:
 
 ```bash
-python run.py --host 127.0.0.1 --port 8080 --config /path/to/custom_config.yaml --debug
+./run.py --host 127.0.0.1 --port 8080 --config /path/to/custom_config.yaml --debug
 ```
 
 ## Configuration
@@ -57,7 +86,7 @@ The server can be configured through a YAML file. By default, it looks for `conf
 You can specify a custom configuration file using the `--config` command-line option:
 
 ```bash
-python run.py --config /path/to/custom_config.yaml
+./run.py --config /path/to/custom_config.yaml
 ```
 
 ## API Endpoints
@@ -172,14 +201,13 @@ ruff check --fix .
 ### Running Tests
 
 ```bash
-cd server
-pytest -v
+uv run pytest -v
 ```
 
 To run with coverage report:
 
 ```bash
-pytest --cov=app
+uv run pytest --cov=app
 ```
 
 ## CI/CD

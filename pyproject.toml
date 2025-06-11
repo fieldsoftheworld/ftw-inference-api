@@ -11,10 +11,34 @@ authors = [
 description = "FastAPI implementation of the Fields of the World Inference API"
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.95.0",
+    "uvicorn>=0.21.1",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.6",
+    "python-jose[cryptography]>=3.3.0",
+    "requests>=2.28.0",
+    "pyyaml>=6.0",
+    "httpx>=0.24.0",
+    "ftw-tools>=1.2.0",
+    "pendulum>=3.0.0",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.3.0",
+    "pytest-cov>=4.1.0",
+    "pre-commit>=3.3.2",
+    "ruff>=0.2.0",
+    "types-requests>=2.31.0",
+    "types-PyYAML>=6.0.12.11",
 ]
 
 [project.urls]
