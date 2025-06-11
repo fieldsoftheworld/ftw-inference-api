@@ -13,7 +13,6 @@ echo "Installing system dependencies..."
 sudo apt-get install -y \
     gdal-bin \
     libgdal-dev \
-    libgdal-arrow-parquet-dev \
     python3-gdal \
     sqlite3 \
     libsqlite3-dev \
@@ -23,8 +22,16 @@ sudo apt-get install -y \
 # Install UV (fast Python package manager)
 echo "Installing UV..."
 curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh | sh
-source ~/.bashrc
-export PATH="$HOME/.cargo/bin:$PATH"
+
+# Add UV to PATH for this session and permanently
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
+# Verify UV is available
+if ! command -v uv &> /dev/null; then
+    echo "❌ UV installation failed"
+    exit 1
+fi
 
 echo "Installing Python dependencies with UV..."
 uv sync
@@ -57,12 +64,27 @@ for model in "${MODELS[@]}"; do
     fi
 done
 
+# Configure for GPU and testing
+echo "Configuring for GPU and testing..."
+
+# Enable GPU in config (replace gpu: null with gpu: 0)
+sed -i 's/gpu: null/gpu: 0/' server/config/config.yaml
+
+# Enable test mode authentication (set auth_disabled: true for easier testing)
+sed -i 's/auth_disabled: false/auth_disabled: true/' server/config/config.yaml
+
 chmod +x run.py
 
 echo "Deployment complete!"
 echo ""
+echo "🔧 Configuration:"
+echo "   ✅ GPU enabled (gpu: 0)"
+echo "   ✅ Auth disabled for testing"
+echo "   🔑 Test JWT token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJndWVzdCIsIm5hbWUiOiJHdWVzdCIsImlhdCI6MTc0ODIxNzYwMCwiZXhwaXJlcyI6OTk5OTk5OTk5OX0.lJIkuuSdE7ihufZwWtLx10D_93ygWUcUrtKhvlh6M8k"
+echo ""
 echo "To start the server:"
-echo "  ./run.py"
+echo "  ./run.py                  # Uses UV automatically"
+echo "  # OR: uv run python run.py"
 echo ""
 echo "For development with auto-reload:"
 echo "  ./run.py --debug"

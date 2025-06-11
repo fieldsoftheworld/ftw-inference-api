@@ -4,10 +4,10 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 
 ## Requirements
 
-- Python 3.11 or 3.12
-- Install GDAL 3.11 or later
-- Install `libgdal-arrow-parquet`
-- All dependencies listed in `server/requirements.txt`
+- Python 3.11 or 3.12 (automatically managed by UV)
+- GDAL 3.11 or later with `libgdal-arrow-parquet`
+- GPU support: NVIDIA GPU with CUDA drivers (for inference acceleration)
+- All dependencies managed via `pyproject.toml`
 
 ## Installation
 
@@ -27,9 +27,11 @@ For deployment on EC2 Ubuntu instances (especially with Deep Learning AMI):
    ```
 
 This script will:
-- Install system dependencies (GDAL, etc.)
+- Install system dependencies (GDAL, SQLite, etc.)
 - Install UV (fast Python package manager)
 - Install all Python dependencies
+- Download ML model checkpoints
+- Configure GPU usage and test authentication
 - Set up the project structure
 
 ### Manual Installation
@@ -122,40 +124,38 @@ For the default config, the following token can be used:
 
 ## Development
 
+### GPU Testing
+
+Test your GPU environment before running inference:
+
+```bash
+uv run python test_gpu.py
+```
+
+This will verify:
+- NVIDIA GPU detection
+- PyTorch CUDA availability 
+- FTW tools import
+- Application GPU configuration
+
 ### Project Structure
 
 ```
-server/
-│
-├── app/                        # Main application package
-│   ├── api/                    # API routes and endpoints
-│   │   └── endpoints.py        # API endpoints implementation
-│   │
-│   ├── core/                   # Core application components
-│   │   ├── auth.py             # Authentication utilities
-│   │   ├── config.py           # Configuration management
-│   │   └── inference.py        # Inference processing logic
-│   │
-│   ├── db/                     # Database related code
-│   │   └── database.py         # Database session and engine setup
-│   │
-│   ├── models/                 # SQLAlchemy models
-│   │   └── project.py          # Project and related models
-│   │
-│   ├── schemas/                # Pydantic schemas
-│   │   └── project.py          # API request/response schemas
-│   │
-│   └── main.py                 # FastAPI application instance
-│
-├── config/                     # Configuration files
-│   └── config.yaml             # Default configuration
-│
-├── test/                       # Test files
-│   ├── conftest.py             # Pytest configuration and fixtures
-│   └── test_api.py             # API endpoint tests
-│
-├── requirements.txt            # Project dependencies
-└── run.py                      # Server startup script
+├── server/                     # Main server code
+│   ├── app/                    # FastAPI application
+│   │   ├── api/endpoints.py    # API endpoints
+│   │   ├── core/               # Config, auth, inference logic
+│   │   ├── db/                 # Database management
+│   │   ├── models/             # SQLAlchemy models
+│   │   ├── schemas/            # Pydantic schemas
+│   │   └── main.py             # FastAPI app instance
+│   ├── config/config.yaml      # Configuration
+│   ├── data/                   # Models, uploads, results
+│   └── test/                   # Tests
+├── deploy.sh                   # EC2 deployment script
+├── run.py                      # Server launcher (uses UV)
+├── test_gpu.py                 # GPU environment test
+└── pyproject.toml              # Dependencies and config
 ```
 
 ### Code Quality

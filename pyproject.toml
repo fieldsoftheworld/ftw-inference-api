@@ -2,6 +2,9 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["server"]
+
 [project]
 name = "ftw-inference-api"
 version = "0.1.0"
@@ -62,11 +65,8 @@ lint.select = [
     "RUF", # Ruff-specific rules
 ]
 
-# Same line length as before
 line-length = 88
-# Target Python version
-target-version = "py310"
-# Set docstring convention
+target-version = "py311"
 lint.pydocstyle.convention = "google"
 # Exclude specific directories
 exclude = [

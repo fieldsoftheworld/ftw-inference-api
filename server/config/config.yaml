@@ -48,4 +48,4 @@ models:
 
 processing:
   max_area_km2: 500.0  # Maximum area in square kilometers for examples
-  gpu: null # null (CPU) or GPU index (e.g., 0 for the first GPU)
+  gpu: 0 # null (CPU) or GPU index (e.g., 0 for the first GPU)

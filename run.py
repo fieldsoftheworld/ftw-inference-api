@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 """
 Fields of the World Inference API Server
 
@@ -20,8 +20,7 @@ from app.core.config import get_settings
 if __name__ == "__main__":
     # Change to server directory for relative paths to work
     os.chdir(server_dir)
-    
-    # Create argument parser
+
     parser = argparse.ArgumentParser(
         description="Run Fields of the World Inference API Server"
     )
@@ -30,7 +29,6 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str, help="Path to config file")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
 
-    # Parse arguments
     args = parser.parse_args()
 
     # Set environment variable for config file if specified
@@ -39,7 +37,6 @@ if __name__ == "__main__":
         if os.path.exists(config_path):
             os.environ["CONFIG_FILE"] = config_path
 
-    # Get settings
     settings = get_settings()
 
     # Override settings with command line arguments
@@ -47,5 +44,4 @@ if __name__ == "__main__":
     port = args.port or settings.port
     debug = args.debug or settings.debug
 
-    # Run server
     uvicorn.run("app.main:app", host=host, port=port, reload=debug)
