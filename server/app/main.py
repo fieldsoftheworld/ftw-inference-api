@@ -1,8 +1,10 @@
 import contextlib
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.endpoints import router as api_router
 from app.core.config import get_settings
@@ -37,6 +39,17 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    first_error = (
+        exc.errors()[0] if exc.errors() else {"msg": "Unknown validation error"}
+    )
+    return JSONResponse(
+        status_code=400,
+        content={"detail": first_error["msg"]},
+    )
 
 
 if __name__ == "__main__":

@@ -369,7 +369,7 @@ components:
     Error:
       type: object
       properties:
-        error:
+        detail:
           type: string
           description: The error message
     Project:

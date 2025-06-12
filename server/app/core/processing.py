@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import subprocess
 import uuid
 from pathlib import Path
@@ -59,10 +60,13 @@ def prepare_inference_params(
         if not isinstance(urls, list) or len(urls) != 2:
             raise ValueError("Images must be a list of two items")
 
+        matcher = re.compile(r"^https?://[\w/.-]+$", re.A | re.I)
         for url in urls:
+            if not matcher.match(url):
+                raise ValueError(f"URL '{url}' contains invalid characters")
             result = urlparse(url)
             if not result.scheme or not result.netloc or not result.path:
-                raise ValueError(f"URL {url} is invalid")
+                raise ValueError(f"URL '{url}' is invalid")
 
     # CHECK MODEL
     model_id = params.get("model")
@@ -71,7 +75,7 @@ def prepare_inference_params(
         None,
     )
     if not model_config:
-        raise ValueError(f"Model with ID {model_id} not found")
+        raise ValueError(f"Model with ID '{model_id}' not found")
 
     # Construct the full path to the model file
     model_path = (
@@ -81,7 +85,7 @@ def prepare_inference_params(
         / model_config.get("file")
     )
     if not model_path.exists():
-        raise ValueError(f"Model file not found at {model_path}")
+        raise ValueError(f"Model file not found at '{model_path}'")
     else:
         params["model"] = str(model_path.absolute())
 
