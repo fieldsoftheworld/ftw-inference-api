@@ -6,9 +6,16 @@ This script starts the FastAPI application server with the specified configurati
 """
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Add server directory to Python path
 server_dir = Path(__file__).parent / "server"
