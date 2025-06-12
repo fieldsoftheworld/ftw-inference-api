@@ -42,6 +42,14 @@ RESULTS_DIR = Path("data/results")
 router = APIRouter()
 
 
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint for load balancer
+    """
+    return {"status": "healthy"}
+
+
 @router.get("/", response_model=RootResponse)
 async def get_root():
     """
