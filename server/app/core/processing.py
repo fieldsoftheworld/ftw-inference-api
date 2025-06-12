@@ -116,7 +116,7 @@ async def run_example(inference_params, polygon_params, ndjson=False, gpu=None):
     uid = str(uuid.uuid4())
     image_file = TEMP_DIR / (uid + ".tif")
     inference_file = TEMP_DIR / (uid + ".inference.tif")
-    polygon_file = TEMP_DIR / (uid + ".ndjson" if ndjson else ".json")
+    polygon_file = TEMP_DIR / (uid + (".ndjson" if ndjson else ".json"))
 
     # Download and combine imagery
     # ftw inference download --out {output_path}
