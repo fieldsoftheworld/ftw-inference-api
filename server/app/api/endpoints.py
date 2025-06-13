@@ -57,6 +57,7 @@ async def get_root():
         "api_version": settings.api_version,
         "title": title,
         "description": description,
+        "min_area_km2": settings.min_area_km2,
         "max_area_km2": settings.max_area_km2,
         "models": settings.models,
     }

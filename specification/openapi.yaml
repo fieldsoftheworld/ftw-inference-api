@@ -36,6 +36,9 @@ paths:
                   description:
                     type: string
                     description: A description of the API
+                  min_area_km2:
+                    type: number
+                    minimum: 0
                   max_area_km2:
                     type: number
                     minimum: 0
