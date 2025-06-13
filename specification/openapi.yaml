@@ -115,6 +115,18 @@ paths:
             application/x-ndjson:
               schema:
                 type: string
+        503:
+          description: Service is busy, retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        504:
+          description: Request timed out. Please try a smaller area.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         4XX:
           $ref: '#/components/responses/4XX'
         5XX:

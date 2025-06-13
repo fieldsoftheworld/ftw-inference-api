@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import verify_auth
 from app.core.config import get_settings
 from app.core.inference import run_task
+from app.core.limiter import delete_logs, setup_logs, timeout
 from app.core.processing import (
     prepare_inference_params,
     prepare_polygon_params,
@@ -64,8 +65,10 @@ async def get_root():
 
 
 @router.put("/example")
+@timeout()
 async def example(
     params: ProcessingParameters,
+    db: Session = Depends(get_db),
     auth: dict = Depends(verify_auth),
     accept: str | None = Header(None),
 ):
@@ -101,7 +104,15 @@ async def example(
         ) from e
 
     # Process inference synchronously
+    log = None
     try:
+        log = setup_logs(db)
+        if log is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Server is busy, try again later",
+            )
+
         response = await run_example(
             inference_params, polygon_params, ndjson=ndjson, gpu=settings.gpu
         )
@@ -115,10 +126,15 @@ async def example(
                 content=response,
                 media_type="application/geo+json",
             )
+    except HTTPException as e:
+        # Re-raise HTTP exceptions to preserve status code and detail
+        raise e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         ) from e
+    finally:
+        delete_logs(db, log)
 
 
 @router.post(
