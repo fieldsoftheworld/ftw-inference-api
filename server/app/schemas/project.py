@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 import pendulum
 from pydantic import (
@@ -8,7 +9,10 @@ from pydantic import (
     field_serializer,
 )
 
+from app.core.config import get_settings
 from app.core.types import PendulumDateTime
+
+allowed_models = [model.get("id") for model in get_settings().models]
 
 
 class ProjectStatus(str, Enum):
@@ -34,7 +38,9 @@ class PolygonizationParameters(BaseModel):
 
 
 class InferenceParameters(BaseModel):
-    model: str = Field(..., description="The id of the model to use for inference")
+    model: Literal[tuple(allowed_models)] = Field(  # type: ignore
+        ..., description="The id of the model to use for inference"
+    )
     bbox: list[float] | None = Field(
         None,
         description="The bounding box of the area to run inference on "
@@ -131,5 +137,6 @@ class RootResponse(BaseModel):
     api_version: str
     title: str
     description: str
+    min_area_km2: float
     max_area_km2: float
     models: list[ModelInfo]

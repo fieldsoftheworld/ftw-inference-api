@@ -36,6 +36,9 @@ paths:
                   description:
                     type: string
                     description: A description of the API
+                  min_area_km2:
+                    type: number
+                    minimum: 0
                   max_area_km2:
                     type: number
                     minimum: 0
@@ -112,6 +115,18 @@ paths:
             application/x-ndjson:
               schema:
                 type: string
+        503:
+          description: Service is busy, retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        504:
+          description: Request timed out. Please try a smaller area.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         4XX:
           $ref: '#/components/responses/4XX'
         5XX:
@@ -369,7 +384,7 @@ components:
     Error:
       type: object
       properties:
-        error:
+        detail:
           type: string
           description: The error message
     Project:

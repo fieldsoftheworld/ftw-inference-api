@@ -24,8 +24,13 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # Maximum area in square kilometers for the example endpoint
-    max_area_km2: float = 1000.0
+    # Minimum/Maximum area in square kilometers for the example endpoint
+    min_area_km2: float = 100.0
+    max_area_km2: float = 500.0
+    # Concurrent request limit for the example endpoint
+    max_concurrent_examples: int = 10
+    # Time in seconds after which to time out and clean up pending example requests
+    example_timeout: int = 60
     # GPU/CPU usage: None (CPU) or GPU index (e.g., 0 for the first GPU)
     gpu: int | None = None
 
@@ -78,7 +83,12 @@ class Settings(BaseSettings):
         self.auth_disabled = security_config.get("auth_disabled", self.auth_disabled)
 
         proc_config = config.get("processing", {})
+        self.min_area_km2 = proc_config.get("min_area_km2", self.min_area_km2)
         self.max_area_km2 = proc_config.get("max_area_km2", self.max_area_km2)
+        self.max_concurrent_examples = proc_config.get(
+            "max_concurrent_examples", self.max_concurrent_examples
+        )
+        self.example_timeout = proc_config.get("example_timeout", self.example_timeout)
         self.gpu = proc_config.get("gpu", self.gpu)
 
 

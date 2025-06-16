@@ -1,6 +1,6 @@
 import asyncio
 import json
-import logging
+import re
 import subprocess
 import uuid
 from pathlib import Path
@@ -8,8 +8,6 @@ from urllib.parse import urlparse
 
 from .config import get_settings
 from .geo import calculate_area_km2
-
-logger = logging.getLogger(__name__)
 
 TEMP_DIR = Path("data/temp")
 
@@ -62,10 +60,13 @@ def prepare_inference_params(
         if not isinstance(urls, list) or len(urls) != 2:
             raise ValueError("Images must be a list of two items")
 
+        matcher = re.compile(r"^https?://[\w/.-]+$", re.A | re.I)
         for url in urls:
+            if not matcher.match(url):
+                raise ValueError(f"URL '{url}' contains invalid characters")
             result = urlparse(url)
             if not result.scheme or not result.netloc or not result.path:
-                raise ValueError(f"URL {url} is invalid")
+                raise ValueError(f"URL '{url}' is invalid")
 
     # CHECK MODEL
     model_id = params.get("model")
@@ -74,7 +75,7 @@ def prepare_inference_params(
         None,
     )
     if not model_config:
-        raise ValueError(f"Model with ID {model_id} not found")
+        raise ValueError(f"Model with ID '{model_id}' not found")
 
     # Construct the full path to the model file
     model_path = (
@@ -84,7 +85,7 @@ def prepare_inference_params(
         / model_config.get("file")
     )
     if not model_path.exists():
-        raise ValueError(f"Model file not found at {model_path}")
+        raise ValueError(f"Model file not found at '{model_path}'")
     else:
         params["model"] = str(model_path.absolute())
 
@@ -112,158 +113,103 @@ async def run_example(inference_params, polygon_params, ndjson=False, gpu=None):
     """
     Run the example inference with the provided parameters.
     """
-    import time
-    
     uid = str(uuid.uuid4())
     image_file = TEMP_DIR / (uid + ".tif")
     inference_file = TEMP_DIR / (uid + ".inference.tif")
-    polygon_file = TEMP_DIR / (uid + ('.ndjson' if ndjson else '.json'))
+    polygon_file = TEMP_DIR / (uid + (".ndjson" if ndjson else ".json"))
 
-    try:
-        # Download and combine imagery
-        start_time = time.perf_counter()
-        win_a = inference_params["images"][0]
-        win_b = inference_params["images"][1]
-        bbox = ",".join(map(str, inference_params["bbox"]))
-        download_cmd = [
-            "ftw",
-            "inference",
-            "download",
-            "--out",
-            str(image_file.absolute()),
-            "--win_a",
-            win_a,
-            "--win_b",
-            win_b,
-            "--bbox",
-            bbox,
-        ]
-        await run_async(download_cmd)
-        download_time = time.perf_counter() - start_time
-        logger.info(f"Download completed in {download_time:.2f}s")
+    # Download and combine imagery
+    # ftw inference download --out {output_path}
+    #   --win_a {url_a} --win_b {url_b} --bbox {bbox}
+    win_a = inference_params["images"][0]
+    win_b = inference_params["images"][1]
+    bbox = ",".join(map(str, inference_params["bbox"]))
+    download_cmd = [
+        "ftw",
+        "inference",
+        "download",
+        "--out",
+        str(image_file.absolute()),
+        "--win_a",
+        win_a,
+        "--win_b",
+        win_b,
+        "--bbox",
+        bbox,
+    ]
+    await run_async(download_cmd)
 
-        # Run ML inference
-        start_time = time.perf_counter()
-        inference_cmd = [
-            "ftw",
-            "inference",
-            "run",
-            str(image_file.absolute()),
-            "--overwrite",
-            "--out",
-            str(inference_file.absolute()),
-            "--model",
-            inference_params["model"],
-            "--resize_factor",
-            str(inference_params["resize_factor"]),
-            "--padding",
-            str(inference_params["padding"]),
-        ]
-        patch_size = inference_params.get("patch_size")
-        if patch_size is not None:
-            inference_cmd.extend(["--patch_size", str(patch_size)])
-        if gpu is not None:
-            inference_cmd.extend(["--gpu", str(gpu)])
+    # ftw inference run {input} --out {output_path}
+    #   --model {model} --resize_factor {resize}
+    #   --patch_size {patch_size} --padding {padding}
+    inference_cmd = [
+        "ftw",
+        "inference",
+        "run",
+        str(image_file.absolute()),
+        "--overwrite",
+        "--out",
+        str(inference_file.absolute()),
+        "--model",
+        inference_params["model"],
+        "--resize_factor",
+        str(inference_params["resize_factor"]),
+        "--padding",
+        str(inference_params["padding"]),
+    ]
+    patch_size = inference_params.get("patch_size")
+    if patch_size is not None:
+        inference_cmd.extend(["--patch_size", str(patch_size)])
+    if gpu is not None:
+        inference_cmd.extend(["--gpu", str(gpu)])
 
-        await run_async(inference_cmd)
-        inference_time = time.perf_counter() - start_time
-        logger.info(f"ML inference completed in {inference_time:.2f}s")
+    await run_async(inference_cmd)
 
-        # Run polygonization
-        start_time = time.perf_counter()
-        polygonize_cmd = [
-            "ftw",
-            "inference",
-            "polygonize",
-            str(inference_file.absolute()),
-            "--overwrite",
-            "--out",
-            str(polygon_file.absolute()),
-            "--simplify",
-            str(polygon_params["simplify"]),
-            "--min_size",
-            str(polygon_params["min_size"]),
-        ]
-        if polygon_params["close_interiors"]:
-            polygonize_cmd.append("--close_interiors")
+    # ftw inference polygonize {input} --out {output_path}
+    #   --simplify {simplify} --min_size {min_size} --close_interiors
+    polygonize_cmd = [
+        "ftw",
+        "inference",
+        "polygonize",
+        str(inference_file.absolute()),
+        "--overwrite",
+        "--out",
+        str(polygon_file.absolute()),
+        "--simplify",
+        str(polygon_params["simplify"]),
+        "--min_size",
+        str(polygon_params["min_size"]),
+    ]
+    if polygon_params["close_interiors"]:
+        polygonize_cmd.append("--close_interiors")
 
-        await run_async(polygonize_cmd)
-        polygonize_time = time.perf_counter() - start_time
-        logger.info(f"Polygonization completed in {polygonize_time:.2f}s")
+    await run_async(polygonize_cmd)
 
-        # Read the resulting GeoJSON and return it
-        with open(polygon_file) as f:
-            data = f.read() if ndjson else json.load(f)
+    # Read the resulting GeoJSON and return it
+    with open(polygon_file) as f:
+        data = f.read() if ndjson else json.load(f)
 
-        # Cleanup temp files
-        image_file.unlink(missing_ok=True)
-        inference_file.unlink(missing_ok=True)
-        polygon_file.unlink(missing_ok=True)
+    image_file.unlink(missing_ok=True)
+    inference_file.unlink(missing_ok=True)
+    polygon_file.unlink(missing_ok=True)
 
-        total_time = download_time + inference_time + polygonize_time
-        logger.info(f"Pipeline completed - Total: {total_time:.2f}s (Download: {download_time:.2f}s, Inference: {inference_time:.2f}s, Polygonize: {polygonize_time:.2f}s)")
-
-        return data
-
-    except Exception as e:
-        # Log error with context for debugging concurrent failures
-        logger.error(f"Pipeline failed for request {uid}: {str(e)}")
-        logger.error(f"Request details - Model: {inference_params.get('model', 'unknown')}, "
-                    f"Bbox: {inference_params.get('bbox', 'unknown')}, "
-                    f"Images: {len(inference_params.get('images', []))} provided")
-        
-        # Cleanup on failure
-        image_file.unlink(missing_ok=True)
-        inference_file.unlink(missing_ok=True)
-        polygon_file.unlink(missing_ok=True)
-        
-        raise
+    return data
 
 
 async def run_async(cmd):
     """Run subprocess command asynchronously"""
-    import os
-    
-    # If command starts with 'ftw', prepend with 'uv run'
-    if cmd[0] == "ftw":
-        cmd = ["uv", "run"] + cmd
-    
-    # Set CUDA environment variables for GPU support
-    env = os.environ.copy()
-    env["CUDA_LAUNCH_BLOCKING"] = "1"
-    
-    try:
-        process = await asyncio.create_subprocess_exec(
-            *cmd, 
-            stdout=asyncio.subprocess.PIPE, 
-            stderr=asyncio.subprocess.PIPE,
-            env=env
-        )
-        stdout, stderr = await process.communicate()
+    # print(" ".join(cmd))
+    # import time
+    # start = time.perf_counter()
+    process = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            # Log detailed error information for debugging
-            cmd_str = ' '.join(cmd)
-            stderr_str = stderr.decode().strip() if stderr else "No stderr"
-            stdout_str = stdout.decode().strip() if stdout else "No stdout"
-            
-            logger.error(f"Command failed: {cmd_str}")
-            logger.error(f"Return code: {process.returncode}")
-            logger.error(f"STDERR: {stderr_str}")
-            logger.error(f"STDOUT: {stdout_str}")
-            
-            # Create a more informative error message
-            error_msg = f"Command failed with return code {process.returncode}"
-            if stderr_str and stderr_str != "No stderr":
-                error_msg += f": {stderr_str}"
-            
-            raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+    # elapsed_time = time.perf_counter() - start
+    # print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
-        return process
-        
-    except Exception as e:
-        # Log any other exceptions (memory issues, process creation failures, etc.)
-        cmd_str = ' '.join(cmd)
-        logger.error(f"Failed to execute command: {cmd_str}")
-        logger.error(f"Exception: {str(e)}")
-        raise
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+
+    return process
