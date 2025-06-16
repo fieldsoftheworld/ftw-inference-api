@@ -2,13 +2,6 @@
 
 This project provides a FastAPI-based implementation of the Fields of the World Inference API based on the OpenAPI specification. It enables running machine learning inference on satellite imagery using the `ftw-tools` package.
 
-## Requirements
-
-- Python 3.11 or 3.12
-- Install GDAL 3.11 or later
-- Install `libgdal-arrow-parquet`
-- All dependencies listed in `server/requirements.txt`
-
 ## Installation
 
 1. Clone the repository:
@@ -17,16 +10,32 @@ This project provides a FastAPI-based implementation of the Fields of the World 
    cd ftw-inference-api
    ```
 
-2. Install dependencies:
+2. Choose between one of the two methods:
+   1. Install via conda:
+      - Create a conda environment:
+        ```
+        conda env create -f server/env.yml
+        ```
+      - Activate the environment:
+        ```bash
+        conda activate ftw-inference-api
+        ```
+
+   2. Manually install the requirements:
+      - Python 3.11 or 3.12
+      - GDAL 3.11 or later with `libgdal-arrow-parquet`
+
+1. Install dependencies:
    ```
    pip install -r server/requirements.txt
    ```
 
-3. For development only: Install development dependencies and set up pre-commit hooks:
+2. For development only: Install development dependencies:
    ```
    pip install -r server/requirements-dev.txt
-   pre-commit install
    ```
+
+3. For development only: Set up pre-commit hooks, see the [Code Quality](#code-quality) chapter.
 
 ## Running the Server
 
