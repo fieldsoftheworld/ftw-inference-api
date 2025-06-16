@@ -1,7 +1,6 @@
 import asyncio
 import json
 import re
-import subprocess
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -94,8 +93,9 @@ def prepare_inference_params(
         raise ValueError("Resize factor must be a positive number")
 
     # CHECK PADDING
-    if params.get("padding") < 0:
-        raise ValueError("Padding must be a positive integer or 0")
+    padding = params.get("padding")
+    if padding is not None and padding < 0:
+        raise ValueError("Padding must be null, a positive integer or 0")
 
     # CHECK PATCH SIZE
     patch_size = params.get("patch_size")
@@ -154,9 +154,10 @@ async def run_example(inference_params, polygon_params, ndjson=False, gpu=None):
         inference_params["model"],
         "--resize_factor",
         str(inference_params["resize_factor"]),
-        "--padding",
-        str(inference_params["padding"]),
     ]
+    padding = inference_params.get("padding")
+    if padding is not None:
+        inference_cmd.extend(["--padding", str(padding)])
     patch_size = inference_params.get("patch_size")
     if patch_size is not None:
         inference_cmd.extend(["--patch_size", str(patch_size)])
@@ -205,11 +206,15 @@ async def run_async(cmd):
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     stdout, stderr = await process.communicate()
+    print(stdout.decode().strip())
+    print(stderr.decode().strip())
 
     # elapsed_time = time.perf_counter() - start
     # print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
     if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+        lines = stderr.decode().strip().splitlines()
+        error_message = lines[-1]
+        raise ValueError(error_message)
 
     return process

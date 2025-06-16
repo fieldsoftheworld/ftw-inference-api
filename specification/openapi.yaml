@@ -360,7 +360,7 @@ components:
           type: integer
           description: |-
             Pixels to discard from each side of the patch.
-          default: 0
+          default: null
     PolygonizationParameters:
       type: object
       description: Polygonization parameters

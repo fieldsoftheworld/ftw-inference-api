@@ -55,7 +55,9 @@ class InferenceParameters(BaseModel):
     patch_size: int | None = Field(
         None, description="Size of patch to use for inference"
     )
-    padding: int = Field(0, description="Pixels to discard from each side of the patch")
+    padding: int | None = Field(
+        None, description="Pixels to discard from each side of the patch"
+    )
 
 
 class ProcessingParameters(BaseModel):
