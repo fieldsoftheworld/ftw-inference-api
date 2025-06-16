@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import verify_auth
 from app.core.config import get_settings
-from app.core.inference import run_task
 from app.core.limiter import delete_logs, setup_logs, timeout
 from app.core.processing import (
     prepare_inference_params,
@@ -306,11 +305,11 @@ async def inference(
     db.commit()
 
     # Start the inference task in the background
-    run_task(project_id, inference_params, process_type="inference")
+    # TODO
 
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content={"message": "Inference task queued for processing"},
+    # return JSONResponse(status_code=status.HTTP_202_ACCEPTED)
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
     )
 
 
@@ -348,11 +347,11 @@ async def polygonize(
     db.commit()
 
     # Start the polygonization task in the background
-    run_task(project_id, polygon_params, process_type="polygonize")
+    # TODO
 
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content={"message": "Polygonization task queued for processing"},
+    # return JSONResponse(status_code=status.HTTP_202_ACCEPTED)
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
     )
 
 

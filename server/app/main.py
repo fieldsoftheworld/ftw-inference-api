@@ -1,7 +1,7 @@
 import contextlib
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -47,7 +47,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         exc.errors()[0] if exc.errors() else {"msg": "Unknown validation error"}
     )
     return JSONResponse(
-        status_code=400,
+        status_code=status.HTTP_400_BAD_REQUEST,
         content={"detail": first_error["msg"]},
     )
 
