@@ -25,17 +25,37 @@ This project provides a FastAPI-based implementation of the Fields of the World 
       - Python 3.11 or 3.12
       - GDAL 3.11 or later with `libgdal-arrow-parquet`
 
-1. Install dependencies:
-   ```
-   pip install -r server/requirements.txt
-   ```
 
-2. For development only: Install development dependencies:
+3. For development only: Install development dependencies:
    ```
    pip install -r server/requirements-dev.txt
    ```
 
-3. For development only: Set up pre-commit hooks, see the [Code Quality](#code-quality) chapter.
+4. For development only: Set up pre-commit hooks, see the [Code Quality](#code-quality) chapter.
+
+## Deployment
+
+### Quick EC2 Deployment
+
+For rapid deployment on AWS EC2 instances using Ubuntu Deep Learning AMI with NVIDIA drivers:
+
+```bash
+curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash
+```
+
+This script will:
+- Install miniforge/conda and create the Python environment
+- Download the repository and install dependencies
+- Download pre-trained model checkpoints (~800MB total)
+- Configure a systemd service for background execution
+- Set up automatic startup on boot and log rotation
+
+**Service management:**
+```bash
+sudo systemctl status ftw-inference-api    # Check status
+sudo systemctl restart ftw-inference-api   # Restart service
+sudo journalctl -u ftw-inference-api -f    # View logs
+```
 
 ## Running the Server
 
