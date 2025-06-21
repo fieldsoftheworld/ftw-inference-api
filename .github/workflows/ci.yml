@@ -17,7 +17,7 @@ jobs:
           # - windows-latest # ignore for now
         python-version:
           - '3.11'
-          - '3.12'
+          # - '3.12' # conflicts with env.yml python=3.11
           # - '3.13' # doesn't work yet
     steps:
     - uses: actions/checkout@v3
@@ -35,6 +35,7 @@ jobs:
 
     - name: Download model(s)
       run: |
+        mkdir -p server/data/models
         curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
 
     - name: Lint and format check with pre-commit
