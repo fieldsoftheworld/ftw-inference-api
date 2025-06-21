@@ -22,16 +22,16 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v3
       with:
         python-version: ${{ matrix.python-version }}
+        environment-file: server/env.yml
+        activate-environment: ftw-inference-api
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r server/requirements.txt
-        pip install pytest pytest-cov pre-commit
+    - name: Install pre-commit
+      run: pip install pre-commit
+      shell: bash -el {0}
 
     - name: Download model(s)
       run: |
@@ -44,3 +44,4 @@ jobs:
       run: |
         cd server
         pytest -v --cov=server
+      shell: bash -el {0}
