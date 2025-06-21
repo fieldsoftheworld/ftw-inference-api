@@ -433,3 +433,11 @@ async def get_inference_results(
     }
 
     return JSONResponse(content=response_data, media_type="application/json")
+
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint for load balancer
+    """
+    return {"status": "healthy"}
