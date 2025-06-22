@@ -44,5 +44,5 @@ jobs:
     - name: Run tests
       run: |
         cd server
-        pytest -v --cov=server
+        pytest -v --cov=app
       shell: bash -el {0}
