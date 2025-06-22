@@ -17,24 +17,25 @@ jobs:
           # - windows-latest # ignore for now
         python-version:
           - '3.11'
-          - '3.12'
+          # - '3.12' # conflicts with env.yml python=3.11
           # - '3.13' # doesn't work yet
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v3
       with:
         python-version: ${{ matrix.python-version }}
+        environment-file: server/env.yml
+        activate-environment: ftw-inference-api
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r server/requirements.txt
-        pip install pytest pytest-cov pre-commit
+    - name: Install pre-commit
+      run: pip install pre-commit
+      shell: bash -el {0}
 
     - name: Download model(s)
       run: |
+        mkdir -p server/data/models
         curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
 
     - name: Lint and format check with pre-commit
@@ -43,4 +44,5 @@ jobs:
     - name: Run tests
       run: |
         cd server
-        pytest -v --cov=server
+        pytest -v --cov=app
+      shell: bash -el {0}
