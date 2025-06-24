@@ -52,3 +52,15 @@ processing:
   max_concurrent_examples: 10  # Maximum number of concurrent examples to process
   example_timeout: 60  # Time in seconds after which to time out and clean up pending example requests
   gpu: null # null (CPU) or GPU index (e.g., 0 for the first GPU)
+
+logging:
+  level: INFO
+  format: json  # json | text
+
+cloudwatch:
+  enabled: false
+  log_group: "/ftw-inference-api"
+  log_stream_prefix: "app"
+  region: "us-west-2"
+  send_interval: 30
+  max_batch_size: 10
