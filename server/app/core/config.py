@@ -5,10 +5,24 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
+
+
+class LoggingConfig(BaseModel):
+    level: str = "INFO"
+    format: str = "json"  # json | text
+
+
+class CloudWatchConfig(BaseModel):
+    enabled: bool = False
+    log_group: str = "/ftw-inference-api"
+    log_stream_prefix: str = "app"
+    region: str = "us-west-2"
+    send_interval: int = 30
+    max_batch_size: int = 10
 
 
 class Settings(BaseSettings):
@@ -48,6 +62,10 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     auth_disabled: bool = False  # Option to disable authentication
+
+    # Logging
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    cloudwatch: CloudWatchConfig = Field(default_factory=CloudWatchConfig)
 
     def load_from_yaml(self, config_file: Path | str):
         """Load configuration from a YAML file"""
@@ -90,6 +108,14 @@ class Settings(BaseSettings):
         )
         self.example_timeout = proc_config.get("example_timeout", self.example_timeout)
         self.gpu = proc_config.get("gpu", self.gpu)
+
+        logging_config = config.get("logging", {})
+        if logging_config:
+            self.logging = LoggingConfig(**logging_config)
+
+        cloudwatch_config = config.get("cloudwatch", {})
+        if cloudwatch_config:
+            self.cloudwatch = CloudWatchConfig(**cloudwatch_config)
 
 
 @lru_cache

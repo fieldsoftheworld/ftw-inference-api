@@ -77,6 +77,9 @@ done
 # Enable GPU in config (replace gpu: null with gpu: 0)
 sed -i 's/gpu: null/gpu: 0/' server/config/config.yaml
 
+# Enable CloudWatch logging
+sed -i 's/enabled: false/enabled: true/' server/config/config.yaml
+
 chmod +x server/run.py
 
 echo "Creating systemd service..."

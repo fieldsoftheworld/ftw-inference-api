@@ -1,12 +1,16 @@
 import asyncio
 import json
 import re
+import time
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
 from .config import get_settings
 from .geo import calculate_area_km2
+from .logging import get_logger
+
+logger = get_logger(__name__)
 
 TEMP_DIR = Path("data/temp")
 
@@ -113,88 +117,223 @@ async def run_example(inference_params, polygon_params, ndjson=False, gpu=None):
     """
     Run the example inference with the provided parameters.
     """
+    start_time = time.time()
     uid = str(uuid.uuid4())
     image_file = TEMP_DIR / (uid + ".tif")
     inference_file = TEMP_DIR / (uid + ".inference.tif")
     polygon_file = TEMP_DIR / (uid + (".ndjson" if ndjson else ".json"))
 
-    # Download and combine imagery
-    # ftw inference download --out {output_path}
-    #   --win_a {url_a} --win_b {url_b} --bbox {bbox}
+    bbox = inference_params["bbox"]
     win_a = inference_params["images"][0]
     win_b = inference_params["images"][1]
-    bbox = ",".join(map(str, inference_params["bbox"]))
-    download_cmd = [
-        "ftw",
-        "inference",
-        "download",
-        "--out",
-        str(image_file.absolute()),
-        "--win_a",
-        win_a,
-        "--win_b",
-        win_b,
-        "--bbox",
-        bbox,
-    ]
-    await run_async(download_cmd)
+    model_id = inference_params.get("model", "unknown")
 
-    # ftw inference run {input} --out {output_path}
-    #   --model {model} --resize_factor {resize}
-    #   --patch_size {patch_size} --padding {padding}
-    inference_cmd = [
-        "ftw",
-        "inference",
-        "run",
-        str(image_file.absolute()),
-        "--overwrite",
-        "--out",
-        str(inference_file.absolute()),
-        "--model",
-        inference_params["model"],
-        "--resize_factor",
-        str(inference_params["resize_factor"]),
-    ]
-    padding = inference_params.get("padding")
-    if padding is not None:
-        inference_cmd.extend(["--padding", str(padding)])
-    patch_size = inference_params.get("patch_size")
-    if patch_size is not None:
-        inference_cmd.extend(["--patch_size", str(patch_size)])
-    if gpu is not None:
-        inference_cmd.extend(["--gpu", str(gpu)])
+    logger.info(
+        "Starting ML inference pipeline",
+        extra={
+            "ml_metrics": {
+                "processing_stage": "pipeline_start",
+                "bounding_box": {
+                    "min_lon": bbox[0],
+                    "min_lat": bbox[1],
+                    "max_lon": bbox[2],
+                    "max_lat": bbox[3],
+                },
+                "bbox_area_km2": calculate_area_km2(bbox),
+                "image_urls": [win_a, win_b],
+                "model_path": model_id,
+                "gpu_enabled": gpu is not None,
+            }
+        },
+    )
 
-    await run_async(inference_cmd)
+    try:
+        # Download and combine imagery
+        # ftw inference download --out {output_path}
+        #   --win_a {url_a} --win_b {url_b} --bbox {bbox}
+        download_start = time.time()
+        logger.info(
+            "Starting image download",
+            extra={
+                "ml_metrics": {
+                    "processing_stage": "download_start",
+                    "image_urls": [win_a, win_b],
+                }
+            },
+        )
 
-    # ftw inference polygonize {input} --out {output_path}
-    #   --simplify {simplify} --min_size {min_size} --close_interiors
-    polygonize_cmd = [
-        "ftw",
-        "inference",
-        "polygonize",
-        str(inference_file.absolute()),
-        "--overwrite",
-        "--out",
-        str(polygon_file.absolute()),
-        "--simplify",
-        str(polygon_params["simplify"]),
-        "--min_size",
-        str(polygon_params["min_size"]),
-    ]
-    if polygon_params["close_interiors"]:
-        polygonize_cmd.append("--close_interiors")
+        bbox_str = ",".join(map(str, bbox))
+        download_cmd = [
+            "ftw",
+            "inference",
+            "download",
+            "--out",
+            str(image_file.absolute()),
+            "--win_a",
+            win_a,
+            "--win_b",
+            win_b,
+            "--bbox",
+            bbox_str,
+        ]
+        await run_async(download_cmd)
 
-    await run_async(polygonize_cmd)
+        download_time = round((time.time() - download_start) * 1000, 2)
+        image_size_mb = round(image_file.stat().st_size / (1024 * 1024), 2)
 
-    # Read the resulting GeoJSON and return it
-    with open(polygon_file) as f:
-        data = f.read() if ndjson else json.load(f)
+        logger.info(
+            "Image download completed",
+            extra={
+                "ml_metrics": {
+                    "processing_stage": "download_complete",
+                    "image_download_time_ms": download_time,
+                    "image_size_mb": image_size_mb,
+                    "image_file": str(image_file),
+                }
+            },
+        )
 
-    image_file.unlink(missing_ok=True)
-    inference_file.unlink(missing_ok=True)
-    polygon_file.unlink(missing_ok=True)
+        # Run ML inference
+        inference_start = time.time()
+        logger.info(
+            "Starting ML inference",
+            extra={
+                "ml_metrics": {
+                    "processing_stage": "inference_start",
+                    "model_path": inference_params["model"],
+                    "resize_factor": inference_params["resize_factor"],
+                    "patch_size": inference_params.get("patch_size"),
+                    "padding": inference_params.get("padding"),
+                }
+            },
+        )
 
-    return data
+        inference_cmd = [
+            "ftw",
+            "inference",
+            "run",
+            str(image_file.absolute()),
+            "--overwrite",
+            "--out",
+            str(inference_file.absolute()),
+            "--model",
+            inference_params["model"],
+            "--resize_factor",
+            str(inference_params["resize_factor"]),
+        ]
+        padding = inference_params.get("padding")
+        if padding is not None:
+            inference_cmd.extend(["--padding", str(padding)])
+        patch_size = inference_params.get("patch_size")
+        if patch_size is not None:
+            inference_cmd.extend(["--patch_size", str(patch_size)])
+        if gpu is not None:
+            inference_cmd.extend(["--gpu", str(gpu)])
+
+        await run_async(inference_cmd)
+
+        inference_time = round((time.time() - inference_start) * 1000, 2)
+        logger.info(
+            "ML inference completed",
+            extra={
+                "ml_metrics": {
+                    "processing_stage": "inference_complete",
+                    "inference_time_ms": inference_time,
+                }
+            },
+        )
+
+        # Generate polygons from inference results
+        # ftw inference polygonize {input} --out {output_path}
+        #   --simplify {simplify} --min_size {min_size} --close_interiors
+        polygonize_start = time.time()
+        logger.info(
+            "Starting polygonization",
+            extra={
+                "ml_metrics": {
+                    "processing_stage": "polygonize_start",
+                    "simplify": polygon_params["simplify"],
+                    "min_size": polygon_params["min_size"],
+                    "close_interiors": polygon_params["close_interiors"],
+                }
+            },
+        )
+
+        polygonize_cmd = [
+            "ftw",
+            "inference",
+            "polygonize",
+            str(inference_file.absolute()),
+            "--overwrite",
+            "--out",
+            str(polygon_file.absolute()),
+            "--simplify",
+            str(polygon_params["simplify"]),
+            "--min_size",
+            str(polygon_params["min_size"]),
+        ]
+        if polygon_params["close_interiors"]:
+            polygonize_cmd.append("--close_interiors")
+
+        await run_async(polygonize_cmd)
+
+        polygonize_time = round((time.time() - polygonize_start) * 1000, 2)
+
+        # Read the resulting GeoJSON and return it
+        with open(polygon_file) as f:
+            data = f.read() if ndjson else json.load(f)
+
+        # Count polygons for metrics
+        if ndjson:
+            polygons_generated = len(data.strip().split("\n")) if data.strip() else 0
+        else:
+            features = data.get("features", []) if isinstance(data, dict) else []
+            polygons_generated = len(features)
+
+        total_time = round((time.time() - start_time) * 1000, 2)
+
+        logger.info(
+            "ML inference pipeline completed",
+            extra={
+                "ml_metrics": {
+                    "processing_stage": "pipeline_complete",
+                    "polygonize_time_ms": polygonize_time,
+                    "total_time_ms": total_time,
+                    "polygons_generated": polygons_generated,
+                    "output_format": "ndjson" if ndjson else "geojson",
+                }
+            },
+        )
+
+        return data
+
+    except Exception as e:
+        total_time = round((time.time() - start_time) * 1000, 2)
+        logger.error(
+            "ML inference pipeline failed",
+            exc_info=True,
+            extra={
+                "ml_context": {
+                    "processing_stage": "pipeline_failed",
+                    "total_time_ms": total_time,
+                    "bounding_box": {
+                        "min_lon": bbox[0],
+                        "min_lat": bbox[1],
+                        "max_lon": bbox[2],
+                        "max_lat": bbox[3],
+                    },
+                    "image_urls": [win_a, win_b],
+                    "model_path": model_id,
+                    "error_type": type(e).__name__,
+                }
+            },
+        )
+        raise
+    finally:
+        # Cleanup temporary files
+        image_file.unlink(missing_ok=True)
+        inference_file.unlink(missing_ok=True)
+        polygon_file.unlink(missing_ok=True)
 
 
 async def run_async(cmd):
