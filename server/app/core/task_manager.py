@@ -2,6 +2,8 @@ import asyncio
 import uuid
 from typing import Any
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.core.types import TaskStatus
 from app.db.database import get_db
 from app.models.project import InferenceResult, Project
@@ -126,6 +128,8 @@ class TaskManager:
             result = await run_project_inference(project_id, params)
 
             if project and result.get("inference_file"):
+                db.refresh(project)
+
                 inference_result = InferenceResult(
                     project_id=project_id,
                     model_id=params.get("model", "unknown"),
@@ -140,8 +144,10 @@ class TaskManager:
                         k: v for k, v in result.items() if k != "inference_file"
                     },
                 }
+                flag_modified(project, "results")
                 project.status = "completed"
                 db.commit()
+                db.refresh(project)
 
             return result
         finally:
@@ -165,6 +171,8 @@ class TaskManager:
             result = await run_project_polygonize(project_id, params)
 
             if project and result.get("polygon_file"):
+                db.refresh(project)
+
                 polygon_result = InferenceResult(
                     project_id=project_id,
                     model_id="polygonization",
@@ -177,8 +185,10 @@ class TaskManager:
                     "file_path": result["polygon_file"],
                     "metrics": {k: v for k, v in result.items() if k != "polygon_file"},
                 }
+                flag_modified(project, "results")
                 project.status = "completed"
                 db.commit()
+                db.refresh(project)
 
             return result
         finally:

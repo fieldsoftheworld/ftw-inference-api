@@ -3,3 +3,5 @@ ruff>=0.2.0
 types-requests>=2.31.0
 types-PyYAML>=6.0.12.11
 pytest-asyncio
+moto[s3]
+pytest-aioboto3

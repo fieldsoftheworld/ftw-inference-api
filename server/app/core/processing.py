@@ -448,7 +448,7 @@ async def run_project_inference(
 ) -> dict[str, Any]:
     """Run inference for a project with hybrid URL/file support."""
     file_manager = get_project_file_manager(project_id)
-    file_manager.ensure_directories()
+    await file_manager.ensure_directories()
 
     # Check if this is URL-based or file-based processing
     if params.get("images") and isinstance(params["images"], list):
@@ -466,9 +466,14 @@ async def run_url_based_inference(
 ) -> dict[str, Any]:
     """Process inference using URLs (similar to /example endpoint)."""
     uid = str(uuid.uuid4())
-    project_results_dir = RESULTS_DIR / project_id
-    image_file = project_results_dir / f"{uid}.tif"
-    inference_file = project_results_dir / f"{uid}.inference.tif"
+    file_manager = get_project_file_manager(project_id)
+
+    # Get temp path for processing
+    temp_image_file = file_manager.get_temp_path(f"{uid}.tif")
+    temp_inference_file = file_manager.get_temp_path(f"{uid}.inference.tif")
+
+    # Get result path (S3 key)
+    inference_result_path = await file_manager.get_result_path("inference")
 
     bbox = params["bbox"]
     win_a = params["images"][0]
@@ -485,10 +490,10 @@ async def run_url_based_inference(
     }
 
     try:
-        # Execute inference pipeline
+        # Execute inference pipeline using temporary files
         result = await _execute_inference_pipeline(
-            image_file,
-            inference_file,
+            temp_image_file,
+            temp_inference_file,
             bbox,
             win_a,
             win_b,
@@ -497,20 +502,30 @@ async def run_url_based_inference(
             progress_callback,
         )
 
+        # Upload result to S3
+        if progress_callback:
+            progress_callback("Uploading inference result to S3")
+
+        s3_url = await file_manager.upload_file(
+            temp_inference_file, inference_result_path
+        )
+        final_result_path = s3_url
+
         logger.info(
-            "Project ML inference completed",
+            "Project ML inference completed and uploaded to S3",
             extra={
                 "ml_metrics": {
                     "processing_stage": "inference_complete",
                     "project_id": project_id,
+                    "s3_url": s3_url,
                     **result,
                 }
             },
         )
 
         return {
-            "inference_file": str(inference_file),
-            "image_file": str(image_file),
+            "inference_file": final_result_path,
+            "image_file": str(temp_image_file),
             **result,
         }
 
@@ -528,8 +543,9 @@ async def run_url_based_inference(
         )
         raise
     finally:
-        # Only cleanup temporary image file, keep inference result
-        image_file.unlink(missing_ok=True)
+        # Cleanup temporary files
+        temp_image_file.unlink(missing_ok=True)
+        temp_inference_file.unlink(missing_ok=True)
 
 
 async def run_file_based_inference(
@@ -551,36 +567,47 @@ async def run_project_polygonize(
     start_time = time.time()
     file_manager = get_project_file_manager(project_id)
 
-    inference_file = file_manager.get_latest_inference_result()
-    if not inference_file:
+    inference_result = await file_manager.get_latest_inference_result()
+    if not inference_result:
         raise ValueError("No inference results found for this project")
 
-    polygon_file = file_manager.get_result_path("polygons")
+    polygon_result_path = await file_manager.get_result_path("polygons")
 
     if progress_callback:
         progress_callback("Starting polygonization")
 
+    uid = str(uuid.uuid4())
+    temp_inference_file = file_manager.get_temp_path(f"{uid}.inference.tif")
+    temp_polygon_file = file_manager.get_temp_path(f"{uid}.polygons.json")
+
     try:
         polygonize_start = time.time()
+
+        if progress_callback:
+            progress_callback("Downloading inference file from S3")
+        await file_manager.download_file(inference_result, temp_inference_file)
+        inference_file_path = temp_inference_file
+
         logger.info(
             "Starting project polygonization",
             extra={
                 "ml_metrics": {
                     "processing_stage": "polygonize_start",
                     "project_id": project_id,
-                    "inference_file": str(inference_file),
+                    "inference_file": str(inference_file_path),
                 }
             },
         )
 
-        polygonize_cmd = _build_polygonize_command(inference_file, polygon_file, params)
+        polygonize_cmd = _build_polygonize_command(
+            inference_file_path, temp_polygon_file, params
+        )
         await run_async(polygonize_cmd)
 
         polygonize_time = round((time.time() - polygonize_start) * 1000, 2)
         total_time = round((time.time() - start_time) * 1000, 2)
 
-        # Read the resulting GeoJSON to count polygons
-        with open(polygon_file) as f:
+        with open(temp_polygon_file) as f:
             geojson_data = json.load(f)
 
         features = (
@@ -588,8 +615,14 @@ async def run_project_polygonize(
         )
         polygons_generated = len(features)
 
+        if progress_callback:
+            progress_callback("Uploading polygon result to S3")
+
+        s3_url = await file_manager.upload_file(temp_polygon_file, polygon_result_path)
+        final_result_path = s3_url
+
         logger.info(
-            "Project polygonization completed",
+            "Project polygonization completed and uploaded to S3",
             extra={
                 "ml_metrics": {
                     "processing_stage": "polygonize_complete",
@@ -597,6 +630,7 @@ async def run_project_polygonize(
                     "polygonize_time_ms": polygonize_time,
                     "total_time_ms": total_time,
                     "polygons_generated": polygons_generated,
+                    "s3_url": s3_url,
                 }
             },
         )
@@ -605,7 +639,7 @@ async def run_project_polygonize(
             progress_callback("Polygonization completed")
 
         return {
-            "polygon_file": str(polygon_file),
+            "polygon_file": final_result_path,
             "polygonize_time_ms": polygonize_time,
             "total_time_ms": total_time,
             "polygons_generated": polygons_generated,
@@ -624,3 +658,6 @@ async def run_project_polygonize(
             },
         )
         raise
+    finally:
+        temp_inference_file.unlink(missing_ok=True)
+        temp_polygon_file.unlink(missing_ok=True)

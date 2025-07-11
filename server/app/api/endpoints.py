@@ -1,5 +1,4 @@
 import json
-import os
 import shutil
 from pathlib import Path
 
@@ -14,9 +13,11 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.auth import verify_auth
 from app.core.config import get_settings
+from app.core.file_manager import get_project_file_manager
 from app.core.limiter import delete_logs, setup_logs, timeout
 from app.core.processing import (
     prepare_inference_params,
@@ -36,9 +37,30 @@ from app.schemas.project import (
     RootResponse,
 )
 
-# Create data directories if they don't exist
-UPLOAD_DIR = Path("data/uploads")
-RESULTS_DIR = Path("data/results")
+
+def _get_project_or_404(db: Session, project_id: str) -> Project:
+    """Get project by ID or raise 404 error."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found",
+        )
+    return project
+
+
+def _build_task_info(task_info: dict[str, str], task_id: str) -> dict[str, str]:
+    """Build task info response dictionary."""
+    return {
+        "task_id": task_id,
+        "task_type": task_info["task_type"],
+        "task_status": task_info["status"],
+        "created_at": task_info["created_at"],
+        "started_at": task_info["started_at"],
+        "completed_at": task_info["completed_at"],
+        "error": task_info["error"],
+    }
+
 
 router = APIRouter()
 
@@ -165,7 +187,24 @@ async def get_projects(
     Get list of projects
     """
     projects = db.query(Project).all()
-    return {"projects": projects}
+
+    clean_projects = []
+    for project in projects:
+        file_manager = get_project_file_manager(project.id)
+        clean_results = await file_manager.get_project_results()
+
+        clean_project = ProjectResponse(
+            id=project.id,
+            title=project.title,
+            status=project.status,
+            progress=project.progress,
+            created_at=project.created_at,
+            parameters=project.parameters,
+            results=clean_results,
+        )
+        clean_projects.append(clean_project)
+
+    return {"projects": clean_projects}
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
@@ -175,15 +214,20 @@ async def get_project(
     """
     Get project details
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = _get_project_or_404(db, project_id)
 
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    file_manager = get_project_file_manager(project_id)
+    clean_results = await file_manager.get_project_results()
 
-    return project
+    return ProjectResponse(
+        id=project.id,
+        title=project.title,
+        status=project.status,
+        progress=project.progress,
+        created_at=project.created_at,
+        parameters=project.parameters,
+        results=clean_results,
+    )
 
 
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -193,25 +237,16 @@ async def delete_project(
     """
     Delete project
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = _get_project_or_404(db, project_id)
 
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    file_manager = get_project_file_manager(project_id)
+
+    import contextlib
+
+    with contextlib.suppress(Exception):
+        await file_manager.cleanup_all_files()
 
     db.delete(project)
-
-    # Delete project directory if it exists
-    project_dir = UPLOAD_DIR / project_id
-    if project_dir.exists() and project_dir.is_dir():
-        shutil.rmtree(project_dir)
-    # Also delete results directory if it exists
-    results_dir = RESULTS_DIR / project_id
-    if results_dir.exists() and results_dir.is_dir():
-        shutil.rmtree(results_dir)
-
     db.commit()
 
 
@@ -233,24 +268,24 @@ async def upload_image(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Window must be 'a' or 'b'"
         )
 
-    # Check if project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    _get_project_or_404(db, project_id)
+    file_manager = get_project_file_manager(project_id)
 
-    # Create uploads directory structure if it doesn't exist
-    project_dir = UPLOAD_DIR / project_id
-    project_dir.mkdir(exist_ok=True, parents=True)
+    # Create temporary file for upload
+    import tempfile
 
-    # Save file
-    file_extension = os.path.splitext(file.filename)[1] if file.filename else ".tif"
-    file_path = project_dir / f"{window}{file_extension}"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".tif") as temp_file:
+        shutil.copyfileobj(file.file, temp_file)
+        temp_path = Path(temp_file.name)
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        # Get S3 upload path and upload file
+        s3_key = await file_manager.get_upload_path(window)
+        s3_url = await file_manager.upload_file(temp_path, s3_key)
+        file_path = s3_url
+    finally:
+        # Clean up temporary file
+        temp_path.unlink(missing_ok=True)
 
     # Check if there's already an image for this window and update it
     existing_image = (
@@ -282,13 +317,7 @@ async def inference(
     """
     Run inference on project images
     """
-    # Check if project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    project = _get_project_or_404(db, project_id)
 
     # Validate parameters
     try:
@@ -299,8 +328,9 @@ async def inference(
             detail=str(e),
         ) from e
 
-    # Update project with parameters (no workaround needed)
+    # Update project with parameters
     project.parameters["inference"] = inference_params
+    flag_modified(project, "parameters")
     project.status = "queued"
     project.progress = None
     db.commit()
@@ -316,6 +346,7 @@ async def inference(
 
     # Store task ID in project for tracking
     project.parameters["task_id"] = task_id
+    flag_modified(project, "parameters")
     db.commit()
 
     return JSONResponse(
@@ -339,13 +370,7 @@ async def polygonize(
     """
     Run polygponization on project images or existing inference results
     """
-    # Check if project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    project = _get_project_or_404(db, project_id)
 
     # Validate parameters
     try:
@@ -356,8 +381,9 @@ async def polygonize(
             detail=str(e),
         ) from e
 
-    # Update project with parameters (no workaround needed)
+    # Update project with parameters
     project.parameters["polygons"] = polygon_params
+    flag_modified(project, "parameters")
     project.status = "queued"
     project.progress = None
     db.commit()
@@ -373,6 +399,7 @@ async def polygonize(
 
     # Store task ID in project for tracking
     project.parameters["polygonize_task_id"] = task_id
+    flag_modified(project, "parameters")
     db.commit()
 
     return JSONResponse(
@@ -396,13 +423,7 @@ async def get_inference_results(
     """
     Get inference results for a project
     """
-    # Check if project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    project = _get_project_or_404(db, project_id)
 
     # Check if project status is completed
     if project.status != "completed":
@@ -471,13 +492,7 @@ async def get_project_status(
     project_id: str, db: Session = Depends(get_db), auth: dict = Depends(verify_auth)
 ):
     """Get current project status and progress"""
-    # Check if project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    project = _get_project_or_404(db, project_id)
 
     response_data = {
         "project_id": project_id,
@@ -486,35 +501,22 @@ async def get_project_status(
         "parameters": project.parameters,
     }
 
-    # Add task status information if available
     task_manager = get_task_manager()
     if "task_id" in project.parameters:
         task_info = await task_manager.get_task_info(project.parameters["task_id"])
         if task_info:
-            response_data["task"] = {
-                "task_id": project.parameters["task_id"],
-                "task_type": task_info["task_type"],
-                "task_status": task_info["status"],
-                "created_at": task_info["created_at"],
-                "started_at": task_info["started_at"],
-                "completed_at": task_info["completed_at"],
-                "error": task_info["error"],
-            }
+            response_data["task"] = _build_task_info(
+                task_info, project.parameters["task_id"]
+            )
 
     if "polygonize_task_id" in project.parameters:
         poly_task_info = await task_manager.get_task_info(
             project.parameters["polygonize_task_id"]
         )
         if poly_task_info:
-            response_data["polygonize_task"] = {
-                "task_id": project.parameters["polygonize_task_id"],
-                "task_type": poly_task_info["task_type"],
-                "task_status": poly_task_info["status"],
-                "created_at": poly_task_info["created_at"],
-                "started_at": poly_task_info["started_at"],
-                "completed_at": poly_task_info["completed_at"],
-                "error": poly_task_info["error"],
-            }
+            response_data["polygonize_task"] = _build_task_info(
+                poly_task_info, project.parameters["polygonize_task_id"]
+            )
 
     return JSONResponse(content=response_data)
 
@@ -527,13 +529,7 @@ async def get_task_status(
     auth: dict = Depends(verify_auth),
 ):
     """Get specific task status and details"""
-    # Check if project exists
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project with ID {project_id} not found",
-        )
+    _get_project_or_404(db, project_id)
 
     # Get task information
     task_manager = get_task_manager()

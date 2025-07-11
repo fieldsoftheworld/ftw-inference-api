@@ -25,6 +25,13 @@ class CloudWatchConfig(BaseModel):
     max_batch_size: int = 10
 
 
+class S3Config(BaseModel):
+    enabled: bool = False
+    bucket_name: str = "dev-ftw-api-model-outputs-2140860f"
+    region: str = "us-west-2"
+    presigned_url_expiry: int = 3600
+
+
 class Settings(BaseSettings):
     # API Settings
     api_title: str = "Fields of the World - Inference API"
@@ -66,6 +73,9 @@ class Settings(BaseSettings):
     # Logging
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     cloudwatch: CloudWatchConfig = Field(default_factory=CloudWatchConfig)
+
+    # S3 Storage
+    s3: S3Config = Field(default_factory=S3Config)
 
     def load_from_yaml(self, config_file: Path | str):
         """Load configuration from a YAML file"""
@@ -116,6 +126,10 @@ class Settings(BaseSettings):
         cloudwatch_config = config.get("cloudwatch", {})
         if cloudwatch_config:
             self.cloudwatch = CloudWatchConfig(**cloudwatch_config)
+
+        s3_config = config.get("s3", {})
+        if s3_config:
+            self.s3 = S3Config(**s3_config)
 
 
 @lru_cache

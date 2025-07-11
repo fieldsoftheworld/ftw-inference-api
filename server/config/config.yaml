@@ -15,7 +15,7 @@ security:
   # This is useful for testing or internal use, but should be false in production
   # For the secret_key "secret_key", you can use the following JWT for testing:
   # eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJndWVzdCIsIm5hbWUiOiJHdWVzdCIsImlhdCI6MTc0ODIxNzYwMCwiZXhwaXJlcyI6OTk5OTk5OTk5OX0.lJIkuuSdE7ihufZwWtLx10D_93ygWUcUrtKhvlh6M8k
-  auth_disabled: false
+  auth_disabled: true
   secret_key: "secret_key" # Secret key for JWT token signing
   access_token_expire_minutes: 30  # Token expiration time in minutes
 
@@ -51,7 +51,7 @@ processing:
   max_area_km2: 500.0  # Maximum area in square kilometers for examples
   max_concurrent_examples: 10  # Maximum number of concurrent examples to process
   example_timeout: 60  # Time in seconds after which to time out and clean up pending example requests
-  gpu: null # null (CPU) or GPU index (e.g., 0 for the first GPU)
+  gpu: 0 # null (CPU) or GPU index (e.g., 0 for the first GPU)
 
 logging:
   level: INFO
@@ -64,3 +64,10 @@ cloudwatch:
   region: "us-west-2"
   send_interval: 30
   max_batch_size: 10
+
+# S3 Storage Configuration
+s3:
+  enabled: true
+  bucket_name: "dev-ftw-api-model-outputs-2140860f"
+  region: "us-west-2"
+  presigned_url_expiry: 3600
