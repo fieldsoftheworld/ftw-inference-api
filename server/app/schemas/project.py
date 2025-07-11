@@ -51,7 +51,7 @@ class InferenceParameters(BaseModel):
         description="A list of two publicly accessible image URLs "
         + "(window A and B) to run inference on",
     )
-    resize_factor: float = Field(2, description="Resize factor to use for inference")
+    resize_factor: int = Field(2, description="Resize factor to use for inference")
     patch_size: int | None = Field(
         None, description="Size of patch to use for inference"
     )
@@ -98,8 +98,8 @@ class ProjectResponse(BaseModel):
     status: ProjectStatus
     progress: float | None = None
     created_at: PendulumDateTime
-    parameters: ProcessingParameters = Field(
-        default_factory=ProcessingParameters,
+    parameters: dict = Field(
+        default_factory=dict,
         description="Parameters for processing the project",
     )
     results: ProjectResults = Field(
@@ -117,6 +117,52 @@ class ProjectResponse(BaseModel):
         if isinstance(dt, pendulum.DateTime):
             return dt.in_timezone("UTC").isoformat().replace("+00:00", "Z")
         return str(dt)
+
+    @field_serializer("parameters")
+    def serialize_parameters(self, parameters) -> dict:
+        """Clean parameters for API response, excluding large fields."""
+        if isinstance(parameters, dict):
+            params_dict = parameters
+        else:
+            params_dict = (
+                parameters.model_dump() if hasattr(parameters, "model_dump") else {}
+            )
+
+        if not params_dict:
+            return {}
+
+        clean_params = {}
+
+        # Clean inference parameters
+        if "inference" in params_dict:
+            inf_params = params_dict["inference"]
+            if inf_params:
+                clean_params["inference"] = {
+                    k: v
+                    for k, v in inf_params.items()
+                    if k != "images"  # Exclude large images array
+                }
+
+                if "model" in inf_params:
+                    model_value = inf_params["model"]
+                    if isinstance(model_value, str) and model_value.endswith(".ckpt"):
+                        clean_params["inference"]["model"] = model_value.split("/")[
+                            -1
+                        ].replace(".ckpt", "")
+                    else:
+                        clean_params["inference"]["model"] = model_value
+
+                if "images" in inf_params:
+                    clean_params["inference"]["images_count"] = len(
+                        inf_params["images"]
+                    )
+
+        # Copy other parameters as-is
+        for key in ["polygons", "task_id", "polygonize_task_id"]:
+            if key in params_dict:
+                clean_params[key] = params_dict[key]
+
+        return clean_params
 
 
 class ProjectsResponse(BaseModel):

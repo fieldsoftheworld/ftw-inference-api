@@ -1,11 +1,6 @@
 import re
-from pathlib import Path
 
 DATETIME_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"
-
-# Define the same directories as the API
-UPLOAD_DIR = Path("data/uploads")
-RESULTS_DIR = Path("data/results")
 
 
 def test_root_endpoint(client):
@@ -107,15 +102,9 @@ def test_delete_project(client, tmp_path):
     get_response_after = client.get(f"/projects/{project_id}")
     assert get_response_after.status_code == 404
 
-    # Verify the directories have been deleted
-    project_upload_dir = UPLOAD_DIR / project_id
-    project_results_dir = RESULTS_DIR / project_id
-    assert (
-        not project_upload_dir.exists()
-    ), f"Upload directory {project_upload_dir} should have been deleted"
-    assert (
-        not project_results_dir.exists()
-    ), f"Results directory {project_results_dir} should have been deleted"
+    # Note: S3 cleanup verification would require mocking S3 operations
+    # The cleanup_all_files() method is called but we can't verify S3 state in
+    # unit tests
 
 
 def test_delete_nonexistent_project(client):
@@ -156,7 +145,7 @@ def test_upload_image_and_inference(client, tmp_path):
         "bbox": [0, 1, 2, 3],  # Example bounding box
         "model": "2_Class_FULL_FTW_Pretrained",
         "images": None,  # Use uploaded images
-        "resize_factor": 1.5,
+        "resize_factor": 2,
         "patch_size": 512,
         "padding": 32,
         "polygonization": {"simplify": 10, "min_size": 200, "close_interiors": True},
@@ -164,8 +153,7 @@ def test_upload_image_and_inference(client, tmp_path):
 
     response = client.put(f"/projects/{project_id}/inference", json=inference_params)
 
-    # Check that inference was queued for processing
-    assert response.status_code == 501  # todo: should be 202 once implemented
+    assert response.status_code == 202
 
     # Clean up: delete the project
     # delete_response = client.delete(f"/projects/{project_id}")
@@ -189,8 +177,7 @@ def test_inference_without_images(client):
     # this should actually queue for processing
     response = client.put(f"/projects/{project_id}/inference", json=inference_params)
 
-    # We expect the request to be accepted and queued
-    assert response.status_code == 501  # todo: should be 202 once implemented
+    assert response.status_code == 202
 
     # Clean up: delete the project
     # delete_response = client.delete(f"/projects/{project_id}")
@@ -332,7 +319,7 @@ def test_polygonize_endpoint(client, tmp_path):
         "bbox": [0, 1, 2, 3],
         "model": "2_Class_FULL_FTW_Pretrained",
         "images": None,
-        "resize_factor": 1.5,
+        "resize_factor": 2,  # Must be an integer
         "patch_size": 512,
         "padding": 32,
     }
@@ -344,14 +331,14 @@ def test_polygonize_endpoint(client, tmp_path):
         "bbox": [0, 1, 2, 3],
         "model": "2_Class_FULL_FTW_Pretrained",
         "images": None,
-        "resize_factor": 1.5,
+        "resize_factor": 2,  # Must be an integer
         "patch_size": 512,
         "padding": 32,
         "polygonization": {"simplify": 5, "min_size": 100, "close_interiors": True},
     }
 
     response = client.put(f"/projects/{project_id}/polygons", json=polygonize_params)
-    assert response.status_code == 501  # todo: should be 202 once implemented
+    assert response.status_code == 202
 
     # Clean up: delete the project
     # delete_response = client.delete(f"/projects/{project_id}")

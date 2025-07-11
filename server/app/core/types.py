@@ -3,6 +3,7 @@ Custom type adapters for Pydantic integration with Pendulum
 """
 
 import datetime
+from enum import Enum
 from typing import Annotated, Any
 
 import pendulum
@@ -72,3 +73,15 @@ class PendulumDateTimeAnnotation:
 
 # Type for use in model fields
 PendulumDateTime = Annotated[pendulum.DateTime, PendulumDateTimeAnnotation]
+
+
+class TaskStatus(Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class TaskType(Enum):
+    INFERENCE = "inference"
+    POLYGONIZE = "polygonize"
