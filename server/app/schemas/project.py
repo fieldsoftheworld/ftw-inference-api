@@ -51,7 +51,7 @@ class InferenceParameters(BaseModel):
         description="A list of two publicly accessible image URLs "
         + "(window A and B) to run inference on",
     )
-    resize_factor: float = Field(2, description="Resize factor to use for inference")
+    resize_factor: int = Field(2, description="Resize factor to use for inference")
     patch_size: int | None = Field(
         None, description="Size of patch to use for inference"
     )

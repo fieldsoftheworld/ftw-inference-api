@@ -10,6 +10,7 @@ from app.api.endpoints import router as api_router
 from app.core.config import get_settings
 from app.core.logging import AppLogger, get_logger
 from app.core.middleware import LoggingMiddleware
+from app.core.task_manager import initialize_task_manager, shutdown_task_manager
 from app.db.database import create_db_and_tables
 
 logger = get_logger(__name__)
@@ -18,13 +19,17 @@ logger = get_logger(__name__)
 # Define lifespan context manager
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize logging and create database tables
+    # Startup: initialize logging, database, and task manager
     AppLogger()
     logger.info("Application starting up")
     create_db_and_tables()
+    await initialize_task_manager()
+    logger.info("Task manager initialized")
     yield
-    # Shutdown: cleanup would go here (if needed)
+    # Shutdown: cleanup task manager and other resources
     logger.info("Application shutting down")
+    await shutdown_task_manager()
+    logger.info("Task manager shutdown complete")
 
 
 # Create FastAPI app with lifespan

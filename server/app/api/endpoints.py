@@ -23,6 +23,7 @@ from app.core.processing import (
     prepare_polygon_params,
     run_example,
 )
+from app.core.task_manager import get_task_manager
 from app.db.database import get_db
 from app.models.project import Image, InferenceResult, Project
 from app.schemas.project import (
@@ -304,12 +305,27 @@ async def inference(
     project.progress = None
     db.commit()
 
-    # Start the inference task in the background
-    # TODO
+    # Submit inference task to background queue
+    task_manager = get_task_manager()
+    task_data = {
+        "task_type": "inference",
+        "project_id": project_id,
+        "inference_params": inference_params,
+    }
+    task_id = await task_manager.submit_task(task_data)
 
-    # return JSONResponse(status_code=status.HTTP_202_ACCEPTED)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
+    # Store task ID in project for tracking
+    project.parameters["task_id"] = task_id
+    db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={
+            "message": "Inference task submitted successfully",
+            "task_id": task_id,
+            "project_id": project_id,
+            "status": "queued",
+        },
     )
 
 
@@ -346,12 +362,27 @@ async def polygonize(
     project.progress = None
     db.commit()
 
-    # Start the polygonization task in the background
-    # TODO
+    # Submit polygonization task to background queue
+    task_manager = get_task_manager()
+    task_data = {
+        "task_type": "polygonize",
+        "project_id": project_id,
+        "polygon_params": polygon_params,
+    }
+    task_id = await task_manager.submit_task(task_data)
 
-    # return JSONResponse(status_code=status.HTTP_202_ACCEPTED)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Not implemented"
+    # Store task ID in project for tracking
+    project.parameters["polygonize_task_id"] = task_id
+    db.commit()
+
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content={
+            "message": "Polygonization task submitted successfully",
+            "task_id": task_id,
+            "project_id": project_id,
+            "status": "queued",
+        },
     )
 
 
@@ -435,9 +466,108 @@ async def get_inference_results(
     return JSONResponse(content=response_data, media_type="application/json")
 
 
+@router.get("/projects/{project_id}/status")
+async def get_project_status(
+    project_id: str, db: Session = Depends(get_db), auth: dict = Depends(verify_auth)
+):
+    """Get current project status and progress"""
+    # Check if project exists
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found",
+        )
+
+    response_data = {
+        "project_id": project_id,
+        "status": project.status,
+        "progress": project.progress,
+        "parameters": project.parameters,
+    }
+
+    # Add task status information if available
+    task_manager = get_task_manager()
+    if "task_id" in project.parameters:
+        task_info = await task_manager.get_task_info(project.parameters["task_id"])
+        if task_info:
+            response_data["task"] = {
+                "task_id": project.parameters["task_id"],
+                "task_type": task_info["task_type"],
+                "task_status": task_info["status"],
+                "created_at": task_info["created_at"],
+                "started_at": task_info["started_at"],
+                "completed_at": task_info["completed_at"],
+                "error": task_info["error"],
+            }
+
+    if "polygonize_task_id" in project.parameters:
+        poly_task_info = await task_manager.get_task_info(
+            project.parameters["polygonize_task_id"]
+        )
+        if poly_task_info:
+            response_data["polygonize_task"] = {
+                "task_id": project.parameters["polygonize_task_id"],
+                "task_type": poly_task_info["task_type"],
+                "task_status": poly_task_info["status"],
+                "created_at": poly_task_info["created_at"],
+                "started_at": poly_task_info["started_at"],
+                "completed_at": poly_task_info["completed_at"],
+                "error": poly_task_info["error"],
+            }
+
+    return JSONResponse(content=response_data)
+
+
+@router.get("/projects/{project_id}/tasks/{task_id}")
+async def get_task_status(
+    project_id: str,
+    task_id: str,
+    db: Session = Depends(get_db),
+    auth: dict = Depends(verify_auth),
+):
+    """Get specific task status and details"""
+    # Check if project exists
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with ID {project_id} not found",
+        )
+
+    # Get task information
+    task_manager = get_task_manager()
+    task_info = await task_manager.get_task_info(task_id)
+
+    if not task_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task with ID {task_id} not found",
+        )
+
+    # Verify task belongs to this project
+    if task_info["project_id"] != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Task does not belong to the specified project",
+        )
+
+    return JSONResponse(
+        content={
+            "task_id": task_id,
+            "project_id": project_id,
+            "task_type": task_info["task_type"],
+            "status": task_info["status"],
+            "created_at": task_info["created_at"],
+            "started_at": task_info["started_at"],
+            "completed_at": task_info["completed_at"],
+            "error": task_info["error"],
+            "result": task_info["result"],
+        }
+    )
+
+
 @router.get("/health")
 async def health_check():
-    """
-    Health check endpoint for load balancer
-    """
+    """Health check endpoint for load balancer"""
     return {"status": "healthy"}

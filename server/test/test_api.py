@@ -164,8 +164,7 @@ def test_upload_image_and_inference(client, tmp_path):
 
     response = client.put(f"/projects/{project_id}/inference", json=inference_params)
 
-    # Check that inference was queued for processing
-    assert response.status_code == 501  # todo: should be 202 once implemented
+    assert response.status_code == 202
 
     # Clean up: delete the project
     # delete_response = client.delete(f"/projects/{project_id}")
@@ -189,8 +188,7 @@ def test_inference_without_images(client):
     # this should actually queue for processing
     response = client.put(f"/projects/{project_id}/inference", json=inference_params)
 
-    # We expect the request to be accepted and queued
-    assert response.status_code == 501  # todo: should be 202 once implemented
+    assert response.status_code == 202
 
     # Clean up: delete the project
     # delete_response = client.delete(f"/projects/{project_id}")
@@ -351,7 +349,7 @@ def test_polygonize_endpoint(client, tmp_path):
     }
 
     response = client.put(f"/projects/{project_id}/polygons", json=polygonize_params)
-    assert response.status_code == 501  # todo: should be 202 once implemented
+    assert response.status_code == 202
 
     # Clean up: delete the project
     # delete_response = client.delete(f"/projects/{project_id}")
