@@ -13,6 +13,8 @@ servers:
 paths:
   /:
     get:
+      tags:
+        - System
       summary: Returns the basic server capabilities.
       operationId: connect
       description: |-
@@ -62,13 +64,41 @@ paths:
                         version:
                           type: string
                           description: The version of the model
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check endpoint
+      operationId: getHealth
+      description: |-
+        This endpoint returns the health status of the service.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                    description: Health status
+        5XX:
+          $ref: '#/components/responses/5XX'
   /example:
     put:
+      tags:
+        - Synchronous Processing
       summary: Compute polygons for a small area quickly
       operationId: getExample
       description: |-
         This endpoint returns computed field boundaries over a small area and
-        returns them as polygons in GeoJSON format.
+        returns them as polygons in GeoJSON format synchronously.
+
+        This is a synchronous endpoint that processes small areas (<500km²) immediately
+        and returns results directly. For larger areas or asynchronous processing,
+        use the project-based workflow.
 
         Errors if the area is too large.
       security:
@@ -133,6 +163,8 @@ paths:
           $ref: '#/components/responses/5XX'
   /projects:
     post:
+      tags:
+        - Projects
       summary: Create a new project
       operationId: createProject
       description: |-
@@ -157,6 +189,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
     get:
+      tags:
+        - Projects
       summary: List of available projects
       operationId: getProjects
       description: |-
@@ -179,6 +213,8 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
+      tags:
+        - Projects
       summary: Get project details
       operationId: getProject
       description: |-
@@ -193,6 +229,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
     delete:
+      tags:
+        - Projects
       summary: Delete a project
       operationId: deleteProject
       description: |-
@@ -202,8 +240,130 @@ paths:
       responses:
         '204':
           description: The project has been deleted.
+  /projects/{project_id}/inference:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags:
+        - Results
+      summary: Get inference results
+      operationId: getInferenceResults
+      description: |-
+        This endpoint returns the inference results for a project.
+        Results can be returned as JSON with signed URLs, or as direct file downloads.
+      security:
+        - bearer: []
+      responses:
+        '200':
+          description: Inference results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inference:
+                    type: string
+                    format: uri
+                    nullable: true
+                    description: Signed URL to inference GeoTIFF file
+                  polygons:
+                    type: string
+                    format: uri
+                    nullable: true
+                    description: Signed URL to polygons GeoJSON file
+            application/geo+json:
+              schema:
+                $ref: 'https://geojson.org/schema/FeatureCollection.json'
+            image/tiff:
+              schema:
+                type: string
+                format: binary
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+    put:
+      tags:
+        - Asynchronous Processing
+      summary: Run inference
+      operationId: inference
+      description: |-
+        This endpoint takes raster images and starts asynchronous processing.
+
+        This is an asynchronous endpoint that queues inference tasks for background
+        processing. Use the task ID returned to monitor progress and retrieve results
+        when complete.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceParameters'
+      responses:
+        '202':
+          description: Successfully queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmission'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+  /projects/{project_id}/status:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags:
+        - Projects
+      summary: Get project status with task details
+      operationId: getProjectStatus
+      description: |-
+        This endpoint returns the current status of a project including task details.
+        Provides more detailed information than the basic project endpoint.
+      security:
+        - bearer: []
+      responses:
+        '200':
+          description: Project status with task information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectStatus'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+  /projects/{project_id}/tasks/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/task_id'
+    get:
+      tags:
+        - Tasks
+      summary: Get task details
+      operationId: getTaskDetails
+      description: |-
+        This endpoint returns detailed information about a specific task within a project.
+      security:
+        - bearer: []
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskDetails'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
   /projects/{project_id}/images/{window}:
     put:
+      tags:
+        - Images
       summary: Upload a raster image to a project
       operationId: uploadImage
       description: |-
@@ -236,38 +396,20 @@ paths:
           $ref: '#/components/responses/4XX'
         5XX:
           $ref: '#/components/responses/5XX'
-  /projects/{project_id}/inference:
-    put:
-      summary: Run inference
-      operationId: inference
-      description: |-
-        This endpoint takes raster images and starts processing.
-      security:
-        - bearer: []
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InferenceParameters'
-      responses:
-        '202':
-          description: Successfully queued for processing
-        4XX:
-          $ref: '#/components/responses/4XX'
-        5XX:
-          $ref: '#/components/responses/5XX'
   /projects/{project_id}/polygons:
     put:
+      tags:
+        - Asynchronous Processing
       summary: Run polygponization
       operationId: polygonize
       description: |-
-        This endpoint queues an additional polygonization step in addition to the inference step.
+        This endpoint queues an asynchronous polygonization step in addition to the inference step.
 
+        This is an asynchronous endpoint that processes polygonization in the background.
         Could also be used to run polygponization on an existing inference result,
         i.e. re-runs polygonization with different parameters if desired.
+
+        Use the task ID returned to monitor progress and retrieve results when complete.
       security:
         - bearer: []
       parameters:
@@ -281,6 +423,10 @@ paths:
       responses:
         '202':
           description: Successfully queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmission'
         4XX:
           $ref: '#/components/responses/4XX'
         5XX:
@@ -292,6 +438,13 @@ components:
       in: path
       required: true
       description: The ID of the project
+      schema:
+        type: string
+    task_id:
+      name: task_id
+      in: path
+      required: true
+      description: The ID of the task
       schema:
         type: string
   responses:
@@ -433,20 +586,8 @@ components:
           description: The creation date of the project
         parameters:
           type: object
-          required:
-            - inference
-            - polygons
-          properties:
-            inference:
-              default: null
-              oneOf:
-                - type: 'null'
-                - $ref: '#/components/schemas/InferenceParameters'
-            polygons:
-              default: null
-              oneOf:
-                - type: 'null'
-                - $ref: '#/components/schemas/PolygonizationParameters'
+          description: Project parameters as a flexible dictionary
+          additionalProperties: true
         results:
           type: object
           required:
@@ -473,6 +614,142 @@ components:
                   description: |-
                     The (signed) URL to the polygons.
                     Content type is `application/geo+json` or `application/x-ndjson`.
+    TaskSubmission:
+      type: object
+      required:
+        - message
+        - task_id
+        - project_id
+        - status
+      properties:
+        message:
+          type: string
+          description: Human-readable message about the task submission
+        task_id:
+          type: string
+          description: Unique identifier for the submitted task
+        project_id:
+          type: string
+          description: The project ID this task belongs to
+        status:
+          type: string
+          enum: [queued]
+          description: Current status of the task
+    ProjectStatus:
+      type: object
+      required:
+        - project_id
+        - status
+        - parameters
+      properties:
+        project_id:
+          type: string
+          description: The project ID
+        status:
+          type: string
+          enum: [created, queued, running, completed, failed]
+          description: Current project status
+        progress:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Progress percentage (0-100)
+        parameters:
+          type: object
+          description: Project parameters as a flexible dictionary
+          additionalProperties: true
+        task:
+          $ref: '#/components/schemas/TaskInfo'
+          nullable: true
+          description: Current inference task information
+        polygonize_task:
+          $ref: '#/components/schemas/TaskInfo'
+          nullable: true
+          description: Current polygonization task information
+    TaskDetails:
+      type: object
+      required:
+        - task_id
+        - task_type
+        - status
+        - project_id
+      properties:
+        task_id:
+          type: string
+          description: Unique task identifier
+        task_type:
+          type: string
+          enum: [inference, polygonize]
+          description: Type of task
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+          description: Current task status
+        project_id:
+          type: string
+          description: Associated project ID
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task creation timestamp
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task start timestamp
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task completion timestamp
+        error:
+          type: string
+          nullable: true
+          description: Error message if task failed
+        result:
+          type: object
+          nullable: true
+          description: Task result data
+          additionalProperties: true
+    TaskInfo:
+      type: object
+      required:
+        - task_id
+        - task_type
+        - task_status
+      properties:
+        task_id:
+          type: string
+          description: Unique task identifier
+        task_type:
+          type: string
+          enum: [inference, polygonize]
+          description: Type of task
+        task_status:
+          type: string
+          enum: [pending, running, completed, failed]
+          description: Current task status
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task creation timestamp
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task start timestamp
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Task completion timestamp
+        error:
+          type: string
+          nullable: true
+          description: Error message if task failed
   securitySchemes:
     bearer:
       description: Bearer token

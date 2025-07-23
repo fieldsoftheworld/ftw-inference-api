@@ -22,7 +22,7 @@ classifiers = [
 "Bug Tracker" = "https://github.com/fieldsoftheworld/ftw-inference-api/issues"
 
 [tool.pytest.ini_options]
-testpaths = ["server/test"]
+testpaths = ["server/tests"]
 
 [tool.ruff]
 # Enable recommended rules
@@ -41,7 +41,7 @@ lint.select = [
 # Same line length as before
 line-length = 88
 # Target Python version
-target-version = "py310"
+target-version = "py311"
 # Set docstring convention
 lint.pydocstyle.convention = "google"
 # Exclude specific directories
@@ -59,7 +59,7 @@ exclude = [
 
 # Handle unused imports/variables
 lint.ignore = [
-    "B008",  # todo: check later
+    "B008",  # Needed for FastAPI DI `Depends()`
 ]
 
 [tool.ruff.format]

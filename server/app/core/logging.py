@@ -102,9 +102,17 @@ class AppLogger:
         console_handler.addFilter(context_filter)
         root_logger.addHandler(console_handler)
 
+        self._setup_cloudwatch_handler(root_logger, formatter, context_filter)
+
+    def _setup_cloudwatch_handler(
+        self,
+        root_logger: logging.Logger,
+        formatter: logging.Formatter,
+        context_filter: ContextFilter,
+    ):
         if self.settings.cloudwatch.enabled:
             try:
-                cloudwatch_handler = watchtower.CloudWatchLogsHandler(
+                cloudwatch_handler = watchtower.CloudWatchLogHandler(
                     log_group=self.settings.cloudwatch.log_group,
                     log_stream=f"{self.settings.cloudwatch.log_stream_prefix}-{socket.gethostname()}",
                     send_interval=self.settings.cloudwatch.send_interval,

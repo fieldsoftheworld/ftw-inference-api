@@ -71,3 +71,9 @@ s3:
   bucket_name: "dev-ftw-api-model-outputs-2140860f"
   region: "us-west-2"
   presigned_url_expiry: 3600
+
+# Local Storage Configuration
+storage:
+  output_dir: "data/results"
+  temp_dir: "data/temp"
+  max_file_size_mb: 1000

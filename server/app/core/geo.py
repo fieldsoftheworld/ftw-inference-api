@@ -11,10 +11,7 @@ def calculate_area_km2(bbox):
     Returns:
         Approximate area in square kilometers
     """
-    # Extract coordinates
     min_lon, min_lat, max_lon, max_lat = bbox
-
-    # Earth's radius in kilometers
     earth_radius = 6371.0
 
     # Convert latitude differences to kilometers
