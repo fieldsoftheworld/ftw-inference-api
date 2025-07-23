@@ -2,6 +2,10 @@ pre-commit>=3.3.2
 ruff>=0.2.0
 types-requests>=2.31.0
 types-PyYAML>=6.0.12.11
+types-python-jose>=3.5.0.20250531
+types-aiofiles>=24.1.0.20250708
+types-aioboto3
 pytest-asyncio
-moto[s3]
 pytest-aioboto3
+moto[s3]
+mypy

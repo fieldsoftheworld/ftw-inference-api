@@ -5,7 +5,7 @@ DATETIME_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"
 
 def test_root_endpoint(client):
     """Test the root endpoint"""
-    response = client.get("/")
+    response = client.get("/v1/")
     assert response.status_code == 200
     data = response.json()
     assert "api_version" in data
@@ -18,7 +18,7 @@ def test_root_endpoint(client):
 
 def test_create_project(client):
     """Test creating a new project"""
-    response = client.post("/projects", json={"title": "Test Project"})
+    response = client.post("/v1/projects", json={"title": "Test Project"})
     assert response.status_code == 201
     data = response.json()
     assert "id" in data
@@ -29,40 +29,40 @@ def test_create_project(client):
 
     # Clean up: delete the project
     project_id = data["id"]
-    delete_response = client.delete(f"/projects/{project_id}")
+    delete_response = client.delete(f"/v1/projects/{project_id}")
     assert delete_response.status_code == 204
 
 
 def test_get_projects(client):
     """Test getting a list of projects"""
     # First create projects
-    response1 = client.post("/projects", json={"title": "Test Project 1"})
+    response1 = client.post("/v1/projects", json={"title": "Test Project 1"})
     project_id1 = response1.json()["id"]
-    response2 = client.post("/projects", json={"title": "Test Project 2"})
+    response2 = client.post("/v1/projects", json={"title": "Test Project 2"})
     project_id2 = response2.json()["id"]
 
     # Then get all projects
-    response = client.get("/projects")
+    response = client.get("/v1/projects")
     assert response.status_code == 200
     data = response.json()
     assert "projects" in data
     assert len(data["projects"]) >= 2
 
     # Clean up: delete the projects
-    delete_response1 = client.delete(f"/projects/{project_id1}")
+    delete_response1 = client.delete(f"/v1/projects/{project_id1}")
     assert delete_response1.status_code == 204
-    delete_response2 = client.delete(f"/projects/{project_id2}")
+    delete_response2 = client.delete(f"/v1/projects/{project_id2}")
     assert delete_response2.status_code == 204
 
 
 def test_get_project(client):
     """Test getting a single project"""
     # First create a project
-    create_response = client.post("/projects", json={"title": "Single Test Project"})
+    create_response = client.post("/v1/projects", json={"title": "Single Test Project"})
     project_id = create_response.json()["id"]
 
     # Then get the project
-    response = client.get(f"/projects/{project_id}")
+    response = client.get(f"/v1/projects/{project_id}")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == project_id
@@ -72,34 +72,34 @@ def test_get_project(client):
     assert re.match(DATETIME_RE, data["created_at"])
 
     # Clean up: delete the project
-    delete_response = client.delete(f"/projects/{project_id}")
+    delete_response = client.delete(f"/v1/projects/{project_id}")
     assert delete_response.status_code == 204
 
 
 def test_get_nonexistent_project(client):
     """Test getting a non-existent project"""
-    response = client.get("/projects/nonexistent")
+    response = client.get("/v1/projects/nonexistent")
     assert response.status_code == 404
 
 
 def test_delete_project(client, tmp_path):
     """Test deleting a project and verify directories are cleaned up"""
     # First create a project
-    create_response = client.post("/projects", json={"title": "Project to Delete"})
+    create_response = client.post("/v1/projects", json={"title": "Project to Delete"})
     assert create_response.status_code == 201
     project_id = create_response.json()["id"]
 
     # Verify the project exists
-    get_response = client.get(f"/projects/{project_id}")
+    get_response = client.get(f"/v1/projects/{project_id}")
     assert get_response.status_code == 200
     assert get_response.json()["title"] == "Project to Delete"
 
     # Delete the project
-    delete_response = client.delete(f"/projects/{project_id}")
+    delete_response = client.delete(f"/v1/projects/{project_id}")
     assert delete_response.status_code == 204
 
     # Verify the project no longer exists in the database
-    get_response_after = client.get(f"/projects/{project_id}")
+    get_response_after = client.get(f"/v1/projects/{project_id}")
     assert get_response_after.status_code == 404
 
     # Note: S3 cleanup verification would require mocking S3 operations
@@ -109,7 +109,7 @@ def test_delete_project(client, tmp_path):
 
 def test_delete_nonexistent_project(client):
     """Test deleting a non-existent project"""
-    response = client.delete("/projects/nonexistent")
+    response = client.delete("/v1/projects/nonexistent")
     assert response.status_code == 404
 
 
@@ -123,13 +123,13 @@ def test_upload_image_and_inference(client, tmp_path):
     test_image_b.write_bytes(b"Mock TIF image data B")
 
     # Create a project
-    create_response = client.post("/projects", json={"title": "Image Test Project"})
+    create_response = client.post("/v1/projects", json={"title": "Image Test Project"})
     project_id = create_response.json()["id"]
 
     # Upload image for window A
     with open(test_image_a, "rb") as f:
         response = client.put(
-            f"/projects/{project_id}/images/a",
+            f"/v1/projects/{project_id}/images/a",
             files={"file": ("test_image_a.tif", f, "image/tiff")},
         )
     assert response.status_code == 201
@@ -137,7 +137,7 @@ def test_upload_image_and_inference(client, tmp_path):
     # Upload image for window B
     with open(test_image_b, "rb") as f:
         response = client.put(
-            f"/projects/{project_id}/images/b",
+            f"/v1/projects/{project_id}/images/b",
             files={"file": ("test_image_b.tif", f, "image/tiff")},
         )
     assert response.status_code == 201  # Run inference
@@ -151,7 +151,7 @@ def test_upload_image_and_inference(client, tmp_path):
         "polygonization": {"simplify": 10, "min_size": 200, "close_interiors": True},
     }
 
-    response = client.put(f"/projects/{project_id}/inference", json=inference_params)
+    response = client.put(f"/v1/projects/{project_id}/inference", json=inference_params)
 
     assert response.status_code == 202
 
@@ -163,7 +163,7 @@ def test_upload_image_and_inference(client, tmp_path):
 def test_inference_without_images(client):
     """Test running inference without uploading images"""
     # Create a project
-    create_response = client.post("/projects", json={"title": "No Images Project"})
+    create_response = client.post("/v1/projects", json={"title": "No Images Project"})
     project_id = create_response.json()["id"]  # Run inference with image URLs
     inference_params = {
         "bbox": None,  # No bounding box
@@ -175,7 +175,7 @@ def test_inference_without_images(client):
         "polygonization": {"simplify": 15, "min_size": 500, "close_interiors": False},
     }  # Since we're mocking the HTTP requests in our implementation
     # this should actually queue for processing
-    response = client.put(f"/projects/{project_id}/inference", json=inference_params)
+    response = client.put(f"/v1/projects/{project_id}/inference", json=inference_params)
 
     assert response.status_code == 202
 
@@ -187,15 +187,17 @@ def test_inference_without_images(client):
 def test_get_inference_results_not_completed(client):
     """Test getting inference results for a project that's not completed"""
     # Create a project
-    create_response = client.post("/projects", json={"title": "Not Completed Project"})
+    create_response = client.post(
+        "/v1/projects", json={"title": "Not Completed Project"}
+    )
     project_id = create_response.json()["id"]
 
     # Try to get inference results
-    response = client.get(f"/projects/{project_id}/inference")
+    response = client.get(f"/v1/projects/{project_id}/inference")
     assert response.status_code == 400  # Bad request, inference not completed
 
     # Clean up: delete the project
-    delete_response = client.delete(f"/projects/{project_id}")
+    delete_response = client.delete(f"/v1/projects/{project_id}")
     assert delete_response.status_code == 204
 
 
@@ -214,7 +216,7 @@ def test_example_endpoint(client):
         "polygons": {},
     }
 
-    response = client.put("/example", json=request_data)
+    response = client.put("/v1/example", json=request_data)
     assert response.status_code == 200
     assert response.headers.get("content-type") == "application/geo+json"
 
@@ -236,7 +238,7 @@ def test_example_endpoint_area_too_large(client):
         "polygons": {},
     }
 
-    response = client.put("/example", json=request_data)
+    response = client.put("/v1/example", json=request_data)
     assert response.status_code == 400  # Bad request, area too large
     assert "Area too large" in response.json()["detail"]
 
@@ -252,7 +254,7 @@ def test_example_endpoint_invalid_bbox(client):
         "polygons": {"simplify": 10, "min_size": 200, "close_interiors": False},
     }
 
-    response = client.put("/example", json=request_data)
+    response = client.put("/v1/example", json=request_data)
     assert response.status_code == 400
     assert "Longitude values" in response.json()["detail"]
 
@@ -265,7 +267,7 @@ def test_example_endpoint_invalid_bbox(client):
         "polygons": {},
     }
 
-    response = client.put("/example", json=request_data)
+    response = client.put("/v1/example", json=request_data)
     assert response.status_code == 400
     assert "Latitude values" in response.json()["detail"]
 
@@ -278,7 +280,7 @@ def test_example_endpoint_invalid_bbox(client):
         "polygons": {},
     }
 
-    response = client.put("/example", json=request_data)
+    response = client.put("/v1/example", json=request_data)
     assert response.status_code == 400
     assert "min values must be less than max values" in response.json()["detail"]
 
@@ -294,14 +296,14 @@ def test_polygonize_endpoint(client, tmp_path):
 
     # Create a project
     create_response = client.post(
-        "/projects", json={"title": "Polygonize Test Project"}
+        "/v1/projects", json={"title": "Polygonize Test Project"}
     )
     project_id = create_response.json()["id"]
 
     # Upload image for window A
     with open(test_image_a, "rb") as f:
         response = client.put(
-            f"/projects/{project_id}/images/a",
+            f"/v1/projects/{project_id}/images/a",
             files={"file": ("test_image_a.tif", f, "image/tiff")},
         )
     assert response.status_code == 201
@@ -309,7 +311,7 @@ def test_polygonize_endpoint(client, tmp_path):
     # Upload image for window B
     with open(test_image_b, "rb") as f:
         response = client.put(
-            f"/projects/{project_id}/images/b",
+            f"/v1/projects/{project_id}/images/b",
             files={"file": ("test_image_b.tif", f, "image/tiff")},
         )
     assert response.status_code == 201
@@ -325,7 +327,7 @@ def test_polygonize_endpoint(client, tmp_path):
     }
 
     response = client.put(
-        f"/projects/{project_id}/inference", json=inference_params
+        f"/v1/projects/{project_id}/inference", json=inference_params
     )  # Now run polygonization with custom parameters
     polygonize_params = {
         "bbox": [0, 1, 2, 3],
@@ -337,7 +339,7 @@ def test_polygonize_endpoint(client, tmp_path):
         "polygonization": {"simplify": 5, "min_size": 100, "close_interiors": True},
     }
 
-    response = client.put(f"/projects/{project_id}/polygons", json=polygonize_params)
+    response = client.put(f"/v1/projects/{project_id}/polygons", json=polygonize_params)
     assert response.status_code == 202
 
     # Clean up: delete the project

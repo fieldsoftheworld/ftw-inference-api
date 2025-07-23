@@ -32,6 +32,14 @@ class S3Config(BaseModel):
     presigned_url_expiry: int = 3600
 
 
+class StorageConfig(BaseModel):
+    """Storage configuration settings"""
+
+    output_dir: str = "data/results"
+    temp_dir: str = "data/temp"
+    max_file_size_mb: int = 100
+
+
 class Settings(BaseSettings):
     # API Settings
     api_title: str = "Fields of the World - Inference API"
@@ -76,6 +84,9 @@ class Settings(BaseSettings):
 
     # S3 Storage
     s3: S3Config = Field(default_factory=S3Config)
+
+    # Local Storage
+    storage: StorageConfig = Field(default_factory=StorageConfig)
 
     def load_from_yaml(self, config_file: Path | str):
         """Load configuration from a YAML file"""
@@ -130,6 +141,10 @@ class Settings(BaseSettings):
         s3_config = config.get("s3", {})
         if s3_config:
             self.s3 = S3Config(**s3_config)
+
+        storage_config = config.get("storage", {})
+        if storage_config:
+            self.storage = StorageConfig(**storage_config)
 
 
 @lru_cache

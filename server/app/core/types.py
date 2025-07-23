@@ -12,6 +12,26 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
 
 
+class TaskStatus(Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class TaskType(Enum):
+    INFERENCE = "inference"
+    POLYGONIZE = "polygonize"
+
+
+class ProjectStatus(str, Enum):
+    CREATED = "created"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class PendulumDateTimeAnnotation:
     """Annotation class for pendulum.DateTime validation and serialization."""
 
@@ -24,7 +44,10 @@ class PendulumDateTimeAnnotation:
         def validate_from_str(value: str) -> pendulum.DateTime:
             """Parse ISO format datetime string to pendulum.DateTime object."""
             try:
-                return pendulum.parse(value)
+                parsed = pendulum.parse(value)
+                if not isinstance(parsed, pendulum.DateTime):
+                    raise ValueError("Expected datetime string, got date or time")
+                return parsed
             except Exception as e:
                 raise ValueError(f"Invalid datetime format: {e}") from e
 
@@ -73,15 +96,3 @@ class PendulumDateTimeAnnotation:
 
 # Type for use in model fields
 PendulumDateTime = Annotated[pendulum.DateTime, PendulumDateTimeAnnotation]
-
-
-class TaskStatus(Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-class TaskType(Enum):
-    INFERENCE = "inference"
-    POLYGONIZE = "polygonize"
