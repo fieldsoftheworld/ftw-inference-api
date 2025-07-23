@@ -91,18 +91,18 @@ python run.py --config /path/to/custom_config.yaml
 
 ## API Endpoints
 
-The API provides the following endpoints:
+The API provides the following versioned endpoints under `/v1/`:
 
 - `GET /`: Root endpoint that returns basic API information
-- `PUT /example`: Compute field boundaries for a small area quickly and return as GeoJSON
-- `POST /projects`: Create a new project
-- `GET /projects`: List all projects
-- `GET /projects/{project_id}`: Get details of a specific project
-- `DELETE /projects/{project_id}`: Delete a specific project
-- `PUT /projects/{project_id}/images/{window}`: Upload an image for a project (window can be 'a' or 'b')
-- `PUT /projects/{project_id}/inference`: Run inference on project images
-- `PUT /projects/{project_id}/polygons`: Run polygonization on inference results
-- `GET /projects/{project_id}/inference`: Get inference results for a project
+- `PUT /v1/example`: Compute field boundaries for a small area quickly and return as GeoJSON
+- `POST /v1/projects`: Create a new project
+- `GET /v1/projects`: List all projects
+- `GET /v1/projects/{project_id}`: Get details of a specific project
+- `DELETE /v1/projects/{project_id}`: Delete a specific project
+- `PUT /v1/projects/{project_id}/images/{window}`: Upload an image for a project (window can be 'a' or 'b')
+- `PUT /v1/projects/{project_id}/inference`: Run inference on project images
+- `PUT /v1/projects/{project_id}/polygons`: Run polygonization on inference results
+- `GET /v1/projects/{project_id}/inference`: Get inference results for a project
 
 ## Authentication
 
@@ -124,38 +124,23 @@ For the default config, the following token can be used:
 
 ### Project Structure
 
+The application follows clean architecture principles with clear separation of concerns:
+
 ```
 server/
-│
 ├── app/                        # Main application package
-│   ├── api/                    # API routes and endpoints
-│   │   └── endpoints.py        # API endpoints implementation
-│   │
-│   ├── core/                   # Core application components
-│   │   ├── auth.py             # Authentication utilities
-│   │   ├── config.py           # Configuration management
-│   │   └── inference.py        # Inference processing logic
-│   │
-│   ├── db/                     # Database related code
-│   │   └── database.py         # Database session and engine setup
-│   │
-│   ├── models/                 # SQLAlchemy models
-│   │   └── project.py          # Project and related models
-│   │
-│   ├── schemas/                # Pydantic schemas
-│   │   └── project.py          # API request/response schemas
-│   │
-│   └── main.py                 # FastAPI application instance
-│
+│   ├── api/v1/                 # API endpoints and dependencies
+│   ├── services/               # Business logic layer
+│   ├── ml/                     # ML pipeline and validation
+│   ├── core/                   # Infrastructure (auth, config, storage)
+│   ├── schemas/                # Pydantic request/response models
+│   ├── models/                 # Database models
+│   ├── db/                     # Database connection and utilities
+│   └── main.py                 # FastAPI application setup
 ├── config/                     # Configuration files
-│   └── config.yaml             # Default configuration
-│
-├── test/                       # Test files
-│   ├── conftest.py             # Pytest configuration and fixtures
-│   └── test_api.py             # API endpoint tests
-│
-├── requirements.txt            # Project dependencies
-└── run.py                      # Server startup script
+├── data/                       # ML models, results, temp files
+├── tests/                      # Test suite
+└── run.py                      # Development server runner
 ```
 
 ### Code Quality
