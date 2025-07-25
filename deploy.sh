@@ -63,7 +63,7 @@ fi
 echo "Installing Pixi environment..."
 # Ensure pixi is in PATH for this command
 export PATH="$HOME/.pixi/bin:$PATH"
-pixi install --environment production
+pixi install
 
 echo "Downloading FTW model checkpoints..."
 mkdir -p server/data/uploads server/data/results server/data/models server/logs
@@ -94,7 +94,7 @@ done
 echo "Creating production environment configuration..."
 cat > /tmp/ftw-production.env << EOF
 # Production Configuration
-PROCESSING__GPU=0
+PROCESSING__GPU=null
 CLOUDWATCH__ENABLED=true
 S3__ENABLED=true
 SECURITY__SECRET_KEY=$(openssl rand -hex 32)
@@ -114,6 +114,17 @@ APP_DIR="$(pwd)"
 USER="$(whoami)"
 HOME_DIR="$(eval echo ~$USER)"
 
+# Conditionally build the ExecStart command based on the GPU configuration.
+# We check the final destination of the production.env file.
+BASE_EXEC_START="${HOME_DIR}/.pixi/bin/pixi run --environment production python run.py --host 0.0.0.0 --port 8000"
+EXEC_START_CMD=$BASE_EXEC_START
+
+if grep -q "PROCESSING__GPU=null" /etc/ftw-inference-api/production.env; then
+    echo "GPU is disabled. Applying CONDA_OVERRIDE_GLIBC to the service."
+    # Prepend the environment variable directly to the command.
+    EXEC_START_CMD="CONDA_OVERRIDE_GLIBC=2.17 ${BASE_EXEC_START}"
+fi
+
 sudo tee /etc/systemd/system/ftw-inference-api.service > /dev/null <<EOF
 [Unit]
 Description=FTW Inference API
@@ -123,10 +134,12 @@ After=network.target
 Type=simple
 User=${USER}
 Group=${USER}
-WorkingDirectory=${APP_DIR}
-Environment=PATH=${HOME_DIR}/.pixi/bin:\$PATH
+WorkingDirectory=${APP_DIR}/server
+# Set a reliable PATH for the service environment.
+Environment="PATH=${HOME_DIR}/.pixi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=/etc/ftw-inference-api/production.env
-ExecStart=${HOME_DIR}/.pixi/bin/pixi run --environment production python server/run.py --host 0.0.0.0 --port 8000
+# Use /bin/sh -c to correctly process the command string with the conditional variable.
+ExecStart=/bin/sh -c "${EXEC_START_CMD}"
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -164,7 +177,7 @@ sudo chown "$USER":"$USER" /var/log/ftw-inference-api
 echo "Enabling and starting the service..."
 sudo systemctl daemon-reload
 sudo systemctl enable ftw-inference-api
-sudo systemctl start ftw-inference-api
+sudo systemctl restart ftw-inference-api # Use restart to ensure changes are applied
 
 # Wait a moment for the service to start
 sleep 5
@@ -175,7 +188,7 @@ sudo systemctl status ftw-inference-api --no-pager
 echo "Deployment complete!"
 echo ""
 echo "Configuration:"
-echo "   GPU enabled (gpu: 0)"
+echo "   Check /etc/ftw-inference-api/production.env for current settings."
 echo ""
 echo "Service Management:"
 echo "  sudo systemctl status ftw-inference-api     # Check status"
