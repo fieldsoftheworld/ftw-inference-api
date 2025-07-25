@@ -1,50 +1,51 @@
+# Build system configuration
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
+# Project metadata
 [project]
 name = "ftw-inference-api"
 version = "0.1.0"
-authors = [
-  {name = "Fields of the World", email = "info@fieldsoftheworld.org"},
-]
 description = "FastAPI implementation of the Fields of the World Inference API"
 readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Fields of the World", email = "info@fieldsoftheworld.org"},
+]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Framework :: FastAPI",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/fieldsoftheworld/ftw-inference-api"
-"Bug Tracker" = "https://github.com/fieldsoftheworld/ftw-inference-api/issues"
+Homepage = "https://github.com/fieldsoftheworld/ftw-inference-api"
+Documentation = "https://github.com/fieldsoftheworld/ftw-inference-api#readme"
+Repository = "https://github.com/fieldsoftheworld/ftw-inference-api"
+Issues = "https://github.com/fieldsoftheworld/ftw-inference-api/issues"
+
+# Tool configurations
+[tool.hatch]
+metadata.allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
 
 [tool.pytest.ini_options]
 testpaths = ["server/tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
-# Enable recommended rules
-lint.select = [
-    "E",   # pycodestyle errors
-    "F",   # pyflakes
-    "I",   # isort
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "SIM", # flake8-simplify
-    "TCH", # flake8-type-checking
-    "RUF", # Ruff-specific rules
-]
-
-# Same line length as before
 line-length = 88
-# Target Python version
 target-version = "py311"
-# Set docstring convention
-lint.pydocstyle.convention = "google"
-# Exclude specific directories
 exclude = [
     ".git",
     ".github",
@@ -55,17 +56,130 @@ exclude = [
     ".env",
     "env",
     "node_modules",
+    ".pixi",
 ]
 
-# Handle unused imports/variables
-lint.ignore = [
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "RUF", # Ruff-specific rules
+]
+ignore = [
     "B008",  # Needed for FastAPI DI `Depends()`
 ]
+pydocstyle.convention = "google"
 
 [tool.ruff.format]
-# Use double quotes for consistency
 quote-style = "double"
-# Line endings
 line-ending = "auto"
-# Match style
 preview = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+exclude = [
+    "^server/tests/.*$"
+]
+
+# Pixi configuration
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.dependencies]
+# Python runtime
+python = "3.11.*"
+pip = "*"
+hatchling = "*"  # Build backend
+
+# Geospatial dependencies (needed by ftw-tools)
+# Version constraints from ftw-baseline to ensure compatibility
+gdal = ">=3.10,<3.12"
+libgdal-arrow-parquet = ">=3.10,<3.12"
+rasterio = ">=1.3,<2.0"
+fiona = ">=1.9,<2.0"
+geopandas = ">=0.14,<2.0"
+pyproj = ">=3.6,<4.0"
+
+# Web framework and async
+fastapi = ">=0.116.1"
+uvicorn = ">=0.35.0"
+aiofiles = ">=23.0.0"
+aioboto3 = ">=14.0.0"
+
+# Data and validation
+pydantic = ">=2.11.7"
+pydantic-settings = ">=2.10.0"
+sqlalchemy = ">=2.0"
+pendulum = ">=3.0.0"
+
+# Utilities
+python-multipart = ">=0.0.6"
+requests = ">=2.28.0"
+pyyaml = ">=6.0"
+watchtower = ">=3.4.0"
+
+[tool.pixi.pypi-dependencies]
+ftw-tools = ">=1.3.0"
+python-jose = { version = ">=3.3.0", extras = ["cryptography"] }
+# CRITICAL: Must use this exact version to avoid filesystem registration error
+# See: https://github.com/apache/arrow/issues/44696
+pyarrow = "==16.1.0"
+
+# Feature definitions
+[tool.pixi.feature.test.dependencies]
+pytest = ">=8.4.1"
+pytest-cov = ">=6.2.1"
+pytest-asyncio = "*"
+httpx = ">=0.24.0"
+
+[tool.pixi.feature.test.pypi-dependencies]
+pytest-aioboto3 = "*"
+moto = { version = "*", extras = ["s3"] }
+
+[tool.pixi.feature.lint.dependencies]
+pre-commit = ">=3.3.2"
+ruff = ">=0.7"
+mypy = "*"
+
+[tool.pixi.feature.lint.pypi-dependencies]
+types-requests = ">=2.31.0"
+types-pyyaml = ">=6.0.12.11"
+types-aiofiles = ">=24.1.0"
+types-python-jose = ">=3.5.0.20250531"
+types-aioboto3 = "*"
+
+[tool.pixi.feature.dev.dependencies]
+pixi-pycharm = ">=0.0.8,<0.0.9"
+
+[tool.pixi.environments]
+default = { features = ["dev", "test", "lint"], solve-group = "default" }
+production = { features = [], solve-group = "production" }
+test = { features = ["test"], solve-group = "default" }
+lint = { features = ["lint"], solve-group = "default" }
+
+[tool.pixi.tasks]
+# Development tasks
+start = { cmd = "python run.py --debug", cwd = "server", depends-on = ["postinstall", "download-model"] }
+postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-check -e ."
+
+# Setup tasks
+download-model = { cmd = "mkdir -p server/data/models && curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt", outputs = ["server/data/models/2_Class_FULL_FTW_Pretrained.ckpt"] }
+
+# Feature-specific tasks
+[tool.pixi.feature.test.tasks]
+test = { cmd = "pytest -v --cov=app", cwd = "server", depends-on = ["postinstall", "download-model"] }
+
+[tool.pixi.feature.lint.tasks]
+lint = { cmd = "pre-commit run --all-files", depends-on = ["postinstall"] }
+format = { cmd = "ruff format .", depends-on = ["postinstall"] }
+check = { cmd = "ruff check .", depends-on = ["postinstall"] }

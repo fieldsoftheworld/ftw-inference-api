@@ -11,20 +11,18 @@ security = HTTPBearer()
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """
-    Create a JWT access token
-    """
+    """Create a JWT access token"""
     settings = get_settings()
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(
-            minutes=settings.access_token_expire_minutes
+            minutes=settings.security.access_token_expire_minutes
         )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        to_encode, settings.secret_key, algorithm=settings.algorithm
+        to_encode, settings.security.secret_key, algorithm=settings.security.algorithm
     )
     # todo: store token in database
     return encoded_jwt
@@ -33,15 +31,13 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 async def verify_auth(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
-    """
-    Verify a JWT token and return the payload
-    """
+    """Verify a JWT token and return the payload"""
     settings = get_settings()
     try:
         payload = jwt.decode(
             credentials.credentials,
-            settings.secret_key,
-            algorithms=[settings.algorithm],
+            settings.security.secret_key,
+            algorithms=[settings.security.algorithm],
         )
     except JWTError as err:
         raise HTTPException(
@@ -50,7 +46,7 @@ async def verify_auth(
             headers={"WWW-Authenticate": "Bearer"},
         ) from err
 
-    if settings.auth_disabled:
+    if settings.security.auth_disabled:
         if payload.get("sub") != "guest":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

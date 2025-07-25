@@ -130,9 +130,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title=settings.api_title,
-        description=settings.api_description,
-        version=settings.api_version,
+        title=settings.api.title,
+        description=settings.api.description,
+        version=settings.api.version,
         lifespan=lifespan,
     )
 
@@ -142,7 +142,7 @@ def create_app() -> FastAPI:
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.cors.origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -168,7 +168,7 @@ app = create_app()
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
-        host=get_settings().host,
-        port=get_settings().port,
-        reload=get_settings().debug,
+        host=get_settings().server.host,
+        port=get_settings().server.port,
+        reload=get_settings().server.debug,
     )

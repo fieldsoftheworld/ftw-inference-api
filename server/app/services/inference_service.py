@@ -77,7 +77,7 @@ class InferenceService:
                 params["inference"],
                 require_bbox=True,
                 require_image_urls=True,
-                max_area=settings.max_area_km2,
+                max_area=settings.processing.max_area_km2,
             )
             polygon_params = params.get("polygons", {})
         except ValueError as e:
@@ -87,7 +87,10 @@ class InferenceService:
 
         try:
             response_data = await self.run_example(
-                inference_params, polygon_params, ndjson=ndjson, gpu=settings.gpu
+                inference_params,
+                polygon_params,
+                ndjson=bool(ndjson) if ndjson is not None else False,
+                gpu=settings.processing.gpu,
             )
 
             return {
@@ -254,8 +257,12 @@ class InferenceService:
                 raise
 
     async def run_example(
-        self, inference_params, polygon_params, ndjson=False, gpu=None
-    ):
+        self,
+        inference_params: dict[str, Any],
+        polygon_params: dict[str, Any],
+        ndjson: bool = False,
+        gpu: int | None = None,
+    ) -> str | dict[str, Any]:
         """Run complete ML pipeline for example workflow."""
         uid = str(uuid.uuid4())
         temp_dir = Path("data/temp")
@@ -300,12 +307,15 @@ class InferenceService:
             )
 
             with open(polygon_file) as f:
-                data = f.read() if ndjson else json.load(f)
+                data: str | dict[str, Any] = f.read() if ndjson else json.load(f)
 
             if ndjson:
-                polygons_generated = (
-                    len(data.strip().split("\n")) if data.strip() else 0
-                )
+                if isinstance(data, str):
+                    polygons_generated = (
+                        len(data.strip().split("\n")) if data.strip() else 0
+                    )
+                else:
+                    polygons_generated = 0
             else:
                 features = data.get("features", []) if isinstance(data, dict) else []
                 polygons_generated = len(features)
@@ -398,7 +408,7 @@ class InferenceService:
         self, project_id: str
     ) -> InferenceResult | None:
         """Get the most recent inference result for a project."""
-        return (
+        result: InferenceResult | None = (
             self.db.query(InferenceResult)
             .filter(
                 InferenceResult.project_id == project_id,
@@ -407,8 +417,11 @@ class InferenceService:
             .order_by(InferenceResult.created_at.desc())
             .first()
         )
+        return result
 
-    def _log_ml_start(self, stage: str, project_id: str | None = None, **extra) -> None:
+    def _log_ml_start(
+        self, stage: str, project_id: str | None = None, **extra: Any
+    ) -> None:
         """Log ML pipeline start events with consistent structure."""
         context = {"processing_stage": f"{stage}_start", **extra}
         if project_id:
@@ -416,7 +429,7 @@ class InferenceService:
         logger.info(f"Starting {stage}", extra={"ml_metrics": context})
 
     def _log_ml_success(
-        self, stage: str, project_id: str | None = None, **extra
+        self, stage: str, project_id: str | None = None, **extra: Any
     ) -> None:
         """Log ML pipeline success events with consistent structure."""
         context = {"processing_stage": f"{stage}_complete", **extra}

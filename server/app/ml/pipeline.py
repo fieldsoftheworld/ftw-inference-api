@@ -57,8 +57,8 @@ async def run_inference(
 
     if gpu is not None:
         cmd.extend(["--gpu", str(gpu)])
-    elif settings.gpu is not None:
-        cmd.extend(["--gpu", str(settings.gpu)])
+    elif settings.processing.gpu is not None:
+        cmd.extend(["--gpu", str(settings.processing.gpu)])
 
     await run_async(cmd)
 
