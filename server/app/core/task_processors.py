@@ -1,5 +1,3 @@
-# FILE: ./app/core/task_processors.py
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from functools import partial

@@ -1,9 +1,10 @@
 import time
 import uuid
-from collections.abc import Callable
+from typing import Any
 
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.core.logging import client_ip, endpoint, get_logger, request_id
 
@@ -13,7 +14,7 @@ logger = get_logger(__name__)
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add API-appropriate security headers to all responses."""
 
-    def __init__(self, app, headers: dict[str, str] | None = None):
+    def __init__(self, app: Any, headers: dict[str, str] | None = None) -> None:
         """Init middleware with minimal headers for API behind AWS API Gateway + WAF."""
         super().__init__(app)
         self.security_headers = headers or {
@@ -21,7 +22,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "Cache-Control": "no-store",
         }
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Add security headers to response."""
         response = await call_next(request)
 
@@ -35,7 +38,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Middleware for structured request/response logging with timing and context."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Log request details, execute handler, and log response w/ timing metrics."""
         start_time = time.time()
         req_id = str(uuid.uuid4())

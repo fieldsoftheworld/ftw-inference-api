@@ -5,7 +5,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def run_async(cmd):
+async def run_async(cmd: list[str]) -> asyncio.subprocess.Process:
     """Run subprocess command asynchronously"""
     logger.debug(f"Running command: {' '.join(cmd)}")
 

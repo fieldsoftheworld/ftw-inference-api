@@ -4,34 +4,18 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 
 ## Installation
 
-1. Clone the repository:
+1. Install [Pixi](https://pixi.sh/):
+   ```bash
+   curl -fsSL https://pixi.sh/install.sh | sh  # macOS/Linux
+   # or: brew install pixi
    ```
-   git clone https://github.com/yourusername/ftw-inference-api.git
+
+2. Clone and setup:
+   ```bash
+   git clone https://github.com/fieldsoftheworld/ftw-inference-api.git
    cd ftw-inference-api
+   pixi install
    ```
-
-2. Choose between one of the two methods:
-   1. Install via conda:
-      - Create a conda environment:
-        ```
-        conda env create -f server/env.yml
-        ```
-      - Activate the environment:
-        ```bash
-        conda activate ftw-inference-api
-        ```
-
-   2. Manually install the requirements:
-      - Python 3.11 or 3.12
-      - GDAL 3.11 or later with `libgdal-arrow-parquet`
-
-
-3. For development only: Install development dependencies:
-   ```
-   pip install -r server/requirements-dev.txt
-   ```
-
-4. For development only: Set up pre-commit hooks, see the [Code Quality](#code-quality) chapter.
 
 ## Deployment
 
@@ -43,50 +27,55 @@ For rapid deployment on AWS EC2 instances using Ubuntu Deep Learning AMI with NV
 curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash
 ```
 
+To deploy a specific branch:
+```bash
+curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash -s -- -b your-branch-name
+```
+
 This script will:
-- Install miniforge/conda and create the Python environment
-- Download the repository and install dependencies
-- Download pre-trained model checkpoints (~800MB total)
-- Configure a systemd service for background execution
-- Set up automatic startup on boot and log rotation
+- Install Pixi package manager
+- Clone the repository and checkout the specified branch
+- Install dependencies using Pixi production environment
+- Download all pre-trained model checkpoints (~800MB total)
+- Enable GPU support in configuration
+- Configure a systemd service for automatic startup
+- Set up log rotation
 
 **Service management:**
 ```bash
-sudo systemctl status ftw-inference-api    # Check status
-sudo systemctl restart ftw-inference-api   # Restart service
-sudo journalctl -u ftw-inference-api -f    # View logs
+sudo systemctl status ftw-inference-api     # Check status
+sudo systemctl start ftw-inference-api      # Start service
+sudo systemctl stop ftw-inference-api       # Stop service
+sudo systemctl restart ftw-inference-api    # Restart service
+sudo journalctl -u ftw-inference-api -f     # Follow logs
+sudo journalctl -u ftw-inference-api --since today  # Today's logs
 ```
 
-## Running the Server
-
-You can run the server using the provided `run.py` script in the server directory:
+## Running the Server in Development Mode
 
 ```bash
-cd server
-python run.py
+pixi run start  # Development server with debug mode and auto reload
 ```
 
-### Command-line Options
-
-- `--host HOST`: Specify the host address to bind the server to (default: 0.0.0.0)
-- `--port PORT`: Specify the port to run the server on (default: 8000)
-- `--config CONFIG`: Path to a custom config file
-- `--debug`: Enable debug mode (enables auto-reload)
-
-Example:
-
+Or run directly with options:
 ```bash
-python run.py --host 127.0.0.1 --port 8080 --config /path/to/custom_config.yaml --debug
+pixi run python server/run.py --host 127.0.0.1 --port 8080 --debug
 ```
+
+**Command-line options:**
+- `--host HOST`: Host address (default: 0.0.0.0)
+- `--port PORT`: Port number (default: 8000)
+- `--config CONFIG`: Custom config file path
+- `--debug`: Enable debug mode and auto-reload
 
 ## Configuration
 
-The server can be configured through a YAML file. By default, it looks for `config.yaml` in the `server/config` directory.
+The server loads configuration from `server/config/base.toml` by default. Settings can be overridden using environment variables with double underscore delimiter (e.g., `SECURITY__SECRET_KEY`).
 
 You can specify a custom configuration file using the `--config` command-line option:
 
 ```bash
-python run.py --config /path/to/custom_config.yaml
+python run.py --config /path/to/custom_config.toml
 ```
 
 ## API Endpoints
@@ -112,7 +101,7 @@ The API uses Bearer token authentication. Include the `Authorization` header wit
 Authorization: Bearer <your_token_here>
 ```
 
-For development and testing, you can disable authentication by setting `auth_disabled` to `true` in `config/config.yaml`.
+For development and testing, you can disable authentication by setting `auth_disabled` to `true` in `server/config/base.toml`.
 
 You still need to send a Bearer token to the API, but you can define a token via jwt.io for example.
 The important part is that the secret key in config and in the config file align.
@@ -145,66 +134,24 @@ server/
 
 ### Code Quality
 
-The project uses [Ruff](https://docs.astral.sh/ruff/) as the primary code quality tool, along with pre-commit hooks to ensure standards are met before committing changes. Ruff replaces multiple tools (black, isort, flake8) with a single, fast linter and formatter written in Rust.
-
-The following checks are enabled:
-- Code formatting with Ruff
-- Code linting with Ruff (includes flake8-equivalent checks)
-- Type checking with mypy
-- Basic file checks (trailing whitespace, end of file, etc.)
-
-To activate the pre-commit hooks, run:
+Uses [Ruff](https://docs.astral.sh/ruff/) for linting/formatting and pre-commit hooks for quality checks.
 
 ```bash
-pip install pre-commit
-pre-commit install
+pixi run lint     # Run all pre-commit hooks
+pixi run format   # Format code
+pixi run check    # Check without fixing
 ```
 
-You can manually run all pre-commit hooks on all files with:
-
+Setup pre-commit:
 ```bash
-pre-commit run --all-files
-```
-
-#### Using Ruff directly
-
-Lint your code:
-```bash
-ruff check .
-```
-
-Format your code:
-```bash
-ruff format .
-```
-
-Auto-fix issues:
-```bash
-ruff check --fix .
+pixi run pre-commit install
 ```
 
 ### Running Tests
 
 ```bash
-cd server
-pytest -v
+pixi run test  # All tests with coverage
 ```
-
-To run with coverage report:
-
-```bash
-pytest --cov=app
-```
-
-## CI/CD
-
-This project includes GitHub Actions workflows in `.github/workflows/` for continuous integration:
-
-- Running tests on multiple Python versions and operating systems
-- Code linting and formatting with Ruff (via pre-commit)
-- Coverage reporting
-
-The CI pipeline uses pre-commit hooks to enforce code quality standards. Pre-commit automatically runs Ruff for linting and formatting, replacing the need for separate tools like black, isort, flake8, and mypy.
 
 ## License
 

@@ -1,22 +1,111 @@
 import logging
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import yaml
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    TomlConfigSettingsSource,
+)
 
 logger = logging.getLogger(__name__)
 
+# Find the project root directory (where .env file is located)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+ENV_FILE_PATH = PROJECT_ROOT / ".env"
+
+
+class APIConfig(BaseModel):
+    """API metadata configuration"""
+
+    title: str = "Fields of the World - Inference API"
+    description: str = "A service for field boundary inference from satellite images."
+    version: str = "0.1.0"
+
+
+class ServerConfig(BaseModel):
+    """Server runtime configuration"""
+
+    host: str = "0.0.0.0"
+    port: int = 8000
+    debug: bool = False
+    database_url: str = "sqlite:///./data/ftw_inference.db"
+
+
+class CORSConfig(BaseModel):
+    """CORS configuration"""
+
+    origins: list[str] = ["*"]
+
+    @field_validator("origins", mode="before")
+    @classmethod
+    def parse_origins(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",")]
+        return v
+
+
+class SecurityConfig(BaseModel):
+    """Security and authentication configuration"""
+
+    secret_key: str = ""
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    auth_disabled: bool = False
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        if not v:
+            raise ValueError(
+                "secret_key is required. "
+                "Please set SECURITY__SECRET_KEY environment variable."
+            )
+        # Allow "secret_key" for backward compatibility with existing tokens
+        if v != "secret_key" and len(v) < 32:
+            raise ValueError("secret_key must be at least 32 characters long")
+        return v
+
+
+class ProcessingConfig(BaseModel):
+    """ML processing configuration"""
+
+    min_area_km2: float = 100.0
+    max_area_km2: float = 500.0
+    max_concurrent_examples: int = 10
+    example_timeout: int = 60
+    gpu: int | None = None
+
 
 class LoggingConfig(BaseModel):
+    """Logging configuration"""
+
     level: str = "INFO"
-    format: str = "json"  # json | text
+    format: str = "json"
+
+    @field_validator("level")
+    @classmethod
+    def validate_level(cls, v: str) -> str:
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in valid_levels:
+            raise ValueError(f"level must be one of {valid_levels}")
+        return v.upper()
+
+    @field_validator("format")
+    @classmethod
+    def validate_format(cls, v: str) -> str:
+        valid_formats = ["json", "text"]
+        if v not in valid_formats:
+            raise ValueError(f"format must be one of {valid_formats}")
+        return v
 
 
 class CloudWatchConfig(BaseModel):
+    """AWS CloudWatch configuration"""
+
     enabled: bool = False
     log_group: str = "/ftw-inference-api"
     log_stream_prefix: str = "app"
@@ -26,14 +115,23 @@ class CloudWatchConfig(BaseModel):
 
 
 class S3Config(BaseModel):
+    """S3 storage configuration"""
+
     enabled: bool = False
-    bucket_name: str = "dev-ftw-api-model-outputs-2140860f"
+    bucket_name: str | None = None
     region: str = "us-west-2"
     presigned_url_expiry: int = 3600
 
+    @field_validator("bucket_name")
+    @classmethod
+    def validate_bucket_name(cls, v: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("enabled") and not v:
+            raise ValueError("bucket_name is required when S3 is enabled")
+        return v
+
 
 class StorageConfig(BaseModel):
-    """Storage configuration settings"""
+    """Local storage configuration"""
 
     output_dir: str = "data/results"
     temp_dir: str = "data/temp"
@@ -41,126 +139,54 @@ class StorageConfig(BaseModel):
 
 
 class Settings(BaseSettings):
-    # API Settings
-    api_title: str = "Fields of the World - Inference API"
-    api_description: str = (
-        "A service for field boundary inference from satellite images."
+    """Application settings with nested configuration support"""
+
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE_PATH),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        env_nested_delimiter="__",
+        toml_file=["config/base.toml"],
+        validate_default=True,
+        extra="allow",
     )
-    api_version: str = "0.1.0"
 
-    # Server settings
-    debug: bool = False
-    host: str = "0.0.0.0"
-    port: int = 8000
-
-    # Minimum/Maximum area in square kilometers for the example endpoint
-    min_area_km2: float = 100.0
-    max_area_km2: float = 500.0
-    # Concurrent request limit for the example endpoint
-    max_concurrent_examples: int = 10
-    # Time in seconds after which to time out and clean up pending example requests
-    example_timeout: int = 60
-    # GPU/CPU usage: None (CPU) or GPU index (e.g., 0 for the first GPU)
-    gpu: int | None = None
-
-    # Database settings
-    database_url: str = "sqlite:///./data/ftw_inference.db"
-
-    # CORS settings
-    cors_origins: list[str] = ["*"]
-
-    # Lift of available models
-    models: list[dict[str, Any]] = Field(default_factory=list)
-
-    # Security
-    secret_key: str = "secret_key"
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
-    auth_disabled: bool = False  # Option to disable authentication
-
-    # Logging
+    api: APIConfig = Field(default_factory=APIConfig)
+    server: ServerConfig = Field(default_factory=ServerConfig)
+    cors: CORSConfig = Field(default_factory=CORSConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
+    processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     cloudwatch: CloudWatchConfig = Field(default_factory=CloudWatchConfig)
-
-    # S3 Storage
     s3: S3Config = Field(default_factory=S3Config)
-
-    # Local Storage
     storage: StorageConfig = Field(default_factory=StorageConfig)
 
-    def load_from_yaml(self, config_file: Path | str):
-        """Load configuration from a YAML file"""
-        config_path = Path(config_file)
-        if not config_path.exists():
-            return
+    models: list[dict[str, Any]] = Field(default_factory=list)
 
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-
-        # Load API settings if they exist
-        self.api_title = config.get("title", self.api_title)
-        self.api_description = config.get("description", self.api_description)
-        self.api_version = config.get("version", self.api_version)
-        self.models = config.get("models", self.models)
-
-        # Load server configuration values if they exist
-        server_config = config.get("server", {})
-        self.host = server_config.get("host", self.host)
-        self.port = server_config.get("port", self.port)
-        self.debug = server_config.get("debug", self.debug)
-        self.cors_origins = server_config.get("cors", {}).get(
-            "origins", self.cors_origins
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            TomlConfigSettingsSource(settings_cls),
+            file_secret_settings,
         )
-        self.database_url = server_config.get("database_url", self.database_url)
-
-        security_config = config.get("security", {})
-        self.secret_key = security_config.get("secret_key", self.secret_key)
-        self.algorithm = security_config.get("algorithm", self.algorithm)
-        self.access_token_expire_minutes = security_config.get(
-            "access_token_expire_minutes", self.access_token_expire_minutes
-        )
-        self.auth_disabled = security_config.get("auth_disabled", self.auth_disabled)
-
-        proc_config = config.get("processing", {})
-        self.min_area_km2 = proc_config.get("min_area_km2", self.min_area_km2)
-        self.max_area_km2 = proc_config.get("max_area_km2", self.max_area_km2)
-        self.max_concurrent_examples = proc_config.get(
-            "max_concurrent_examples", self.max_concurrent_examples
-        )
-        self.example_timeout = proc_config.get("example_timeout", self.example_timeout)
-        self.gpu = proc_config.get("gpu", self.gpu)
-
-        logging_config = config.get("logging", {})
-        if logging_config:
-            self.logging = LoggingConfig(**logging_config)
-
-        cloudwatch_config = config.get("cloudwatch", {})
-        if cloudwatch_config:
-            self.cloudwatch = CloudWatchConfig(**cloudwatch_config)
-
-        s3_config = config.get("s3", {})
-        if s3_config:
-            self.s3 = S3Config(**s3_config)
-
-        storage_config = config.get("storage", {})
-        if storage_config:
-            self.storage = StorageConfig(**storage_config)
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """
-    Returns a cached instance of the Settings object.
-    This ensures settings are loaded only once during the application lifecycle.
-    """
-    settings = Settings()
-
-    config_path = os.environ.get("CONFIG_FILE", "config/config.yaml")
-    p = Path(config_path)
-    if p.exists():
-        logger.info("Loading config from:" + str(p.absolute()))
-        settings.load_from_yaml(p)
-    else:
-        logger.warning(f"Config file {p.absolute()} does not exist, using defaults.")
-
-    return settings
+    """Returns a cached instance of the Settings object"""
+    try:
+        settings = Settings()
+        return settings
+    except Exception as e:
+        logger.error(f"Failed to load configuration: {e}")
+        raise

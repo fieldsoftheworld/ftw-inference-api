@@ -3,7 +3,7 @@ import logging
 import logging.handlers
 import socket
 from contextvars import ContextVar
-from typing import Optional
+from typing import ClassVar
 
 import watchtower
 
@@ -15,7 +15,8 @@ endpoint: ContextVar[str] = ContextVar("endpoint", default="")
 
 
 class ContextFilter(logging.Filter):
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Add request context to log record."""
         record.request_id = request_id.get("")
         record.client_ip = client_ip.get("")
         record.endpoint = endpoint.get("")
@@ -25,6 +26,7 @@ class ContextFilter(logging.Filter):
 
 class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON string."""
         log_entry = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
@@ -66,22 +68,23 @@ class JSONFormatter(logging.Formatter):
 
 
 class AppLogger:
-    _instance: Optional["AppLogger"] = None
-    _initialized = False
+    _instance: ClassVar["AppLogger | None"] = None
+    _initialized: ClassVar[bool] = False
 
-    def __new__(cls):
+    def __new__(cls) -> "AppLogger":
+        """Ensure singleton instance creation."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
-        if self._initialized:
+    def __init__(self) -> None:
+        if AppLogger._initialized:
             return
-        self._initialized = True
+        AppLogger._initialized = True
         self.settings = get_settings()
         self._setup_logging()
 
-    def _setup_logging(self):
+    def _setup_logging(self) -> None:
         root_logger = logging.getLogger()
         root_logger.setLevel(getattr(logging, self.settings.logging.level.upper()))
 
@@ -90,6 +93,7 @@ class AppLogger:
 
         context_filter = ContextFilter()
 
+        formatter: logging.Formatter
         if self.settings.logging.format == "json":
             formatter = JSONFormatter(datefmt="%Y-%m-%dT%H:%M:%S.%fZ")
         else:
@@ -109,7 +113,7 @@ class AppLogger:
         root_logger: logging.Logger,
         formatter: logging.Formatter,
         context_filter: ContextFilter,
-    ):
+    ) -> None:
         if self.settings.cloudwatch.enabled:
             try:
                 cloudwatch_handler = watchtower.CloudWatchLogHandler(
