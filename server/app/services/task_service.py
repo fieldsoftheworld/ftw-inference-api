@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from app.core.queue import QueueBackend
+from app.core.queue import QueueBackend, TaskInfo
 from app.core.types import TaskStatus, TaskType
 
 
@@ -64,7 +64,10 @@ class TaskService:
     # --- Internal Helper Methods ---
 
     def _format_task_info(
-        self, task_info, task_id: str | None = None, project_id: str | None = None
+        self,
+        task_info: TaskInfo,
+        task_id: str | None = None,
+        project_id: str | None = None,
     ) -> dict[str, Any]:
         """Format task info for TaskInfoResponse (project status)."""
         return {
@@ -84,7 +87,10 @@ class TaskService:
         }
 
     def _format_task_details(
-        self, task_info, task_id: str | None = None, project_id: str | None = None
+        self,
+        task_info: TaskInfo,
+        task_id: str | None = None,
+        project_id: str | None = None,
     ) -> dict[str, Any]:
         """Format task info for TaskDetailsResponse."""
         return {

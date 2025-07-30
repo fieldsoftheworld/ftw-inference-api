@@ -1,0 +1,85 @@
+[api]
+title = "Fields of the World - Inference API"
+description = "A service for field boundary inference from satellite images."
+version = "0.1.0"
+
+[server]
+host = "0.0.0.0"
+port = 8000
+debug = false
+database_url = "sqlite:///./data/ftw_inference.db"
+
+[cors]
+origins = ["*"]
+
+[security]
+# IMPORTANT: Change this secret_key in production via SECURITY__SECRET_KEY environment variable
+# For the secret_key "dev_secret_key_change_in_production_32chars", you can use the following JWT for testing:
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJndWVzdCIsIm5hbWUiOiJHdWVzdCIsImlhdCI6MTc0ODIxNzYwMCwiZXhwaXJlcyI6OTk5OTk5OTk5OX0.lJIkuuSdE7ihufZwWtLx10D_93ygWUcUrtKhvlh6M8k
+secret_key = "dev_secret_key_change_in_production_32chars"
+auth_disabled = true
+algorithm = "HS256"
+access_token_expire_minutes = 30
+
+[processing]
+min_area_km2 = 100.0
+max_area_km2 = 500.0
+max_concurrent_examples = 10
+example_timeout = 60
+gpu = 0  # null for CPU, 0 for first GPU
+
+[logging]
+level = "INFO"
+format = "json"  # json | text
+
+[cloudwatch]
+enabled = false
+log_group = "/ftw-inference-api"
+log_stream_prefix = "app"
+region = "us-west-2"
+send_interval = 30
+max_batch_size = 10
+
+[s3]
+enabled = true
+bucket_name = "dev-ftw-api-model-outputs-2140860f"
+region = "us-west-2"
+presigned_url_expiry = 3600
+
+[storage]
+output_dir = "data/results"
+temp_dir = "data/temp"
+max_file_size_mb = 1000
+
+# Models configuration
+[[models]]
+id = "2_Class_FULL_FTW_Pretrained"
+title = "FTW v1 / 2-Class / Full"
+description = "2-Class model trained on the full FTW dataset for field boundary inference"
+license = "proprietary"
+version = "v1"
+file = "2_Class_FULL_FTW_Pretrained.ckpt"
+
+[[models]]
+id = "2_Class_CCBY_FTW_Pretrained"
+title = "FTW v1 / 2-Class / CC-BY"
+description = "2-Class model trained on a limited FTW dataset for field boundary inference"
+license = "CC-BY-4.0"
+version = "v1"
+file = "2_Class_CCBY_FTW_Pretrained.ckpt"
+
+[[models]]
+id = "3_Class_FULL_FTW_Pretrained"
+title = "FTW v1 / 3-Class / Full"
+description = "3-Class model trained on the full FTW dataset for field boundary inference"
+license = "proprietary"
+version = "v1"
+file = "3_Class_FULL_FTW_Pretrained.ckpt"
+
+[[models]]
+id = "3_Class_CCBY_FTW_Pretrained"
+title = "FTW v1 / 3-Class / CC-BY"
+description = "3-Class model trained on a limited FTW dataset for field boundary inference"
+license = "CC-BY-4.0"
+version = "v1"
+file = "3_Class_CCBY_FTW_Pretrained.ckpt"

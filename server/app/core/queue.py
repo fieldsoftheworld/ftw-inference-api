@@ -202,7 +202,7 @@ class InMemoryQueue:
 class SQSQueue:
     """AWS SQS implementation of QueueBackend - TODO: Implement during migration"""
 
-    def __init__(self, sqs_settings) -> None:
+    def __init__(self, sqs_settings: Any) -> None:
         # TODO: Implement SQS-based queue during cloud migration
         # Will use boto3 SQS client for queue operations
         # Workers will be deployed as separate ECS tasks/Lambda functions
@@ -230,7 +230,7 @@ class SQSQueue:
 
 
 def get_queue(
-    settings, task_processors: dict[str, Callable] | None = None
+    settings: Any, task_processors: dict[str, Callable] | None = None
 ) -> QueueBackend:
     """Get queue backend based on configuration"""
     # For now, always return InMemoryQueue

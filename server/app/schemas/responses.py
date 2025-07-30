@@ -48,11 +48,12 @@ class ProjectResponse(BaseModel):
     def serialize_datetime(self, dt: pendulum.DateTime) -> str:
         """Serialize pendulum DateTime to ISO8601 string with Z timezone designator"""
         if isinstance(dt, pendulum.DateTime):
-            return dt.in_timezone("UTC").isoformat().replace("+00:00", "Z")
-        return str(dt)
+            iso_str: str = dt.in_timezone("UTC").isoformat().replace("+00:00", "Z")
+            return iso_str
+        return str(dt) if dt is not None else ""
 
     @field_serializer("parameters")
-    def serialize_parameters(self, parameters) -> dict:
+    def serialize_parameters(self, parameters: Any) -> dict[str, Any]:
         """Clean parameters for API response, excluding large fields."""
         if isinstance(parameters, dict):
             params_dict = parameters

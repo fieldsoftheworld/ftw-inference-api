@@ -1,9 +1,30 @@
 #!/bin/bash
-# Deployment script for Ubuntu Deep Learning AMI instances with miniforge and systemd service
+# Deployment script for Ubuntu Deep Learning AMI instances with Pixi and systemd service
 
 set -e
 
+# Parse command line arguments
+BRANCH="main"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -b|--branch)
+            BRANCH="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: $0 [-b|--branch BRANCH_NAME]"
+            echo "  -b, --branch    Git branch to deploy (default: main)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option $1"
+            exit 1
+            ;;
+    esac
+done
+
 echo "Deploying FTW Inference API on EC2..."
+echo "Using branch: $BRANCH"
 
 echo "Updating system packages..."
 sudo apt-get update
@@ -12,42 +33,37 @@ sudo apt-get upgrade -y
 echo "Installing system dependencies..."
 sudo apt-get install -y \
     sqlite3 \
-    libsqlite3-dev
+    libsqlite3-dev \
+    curl
 
-echo "Installing miniforge..."
-if [ -d "$HOME/miniforge3" ]; then
-    echo "Miniforge already installed, skipping..."
+echo "Installing Pixi..."
+if command -v pixi &> /dev/null; then
+    echo "Pixi already installed, skipping..."
 else
-    cd /tmp
-    wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
-    chmod +x Miniforge3-Linux-x86_64.sh
-    ./Miniforge3-Linux-x86_64.sh -b -p "$HOME"/miniforge3
-
-    # Initialize conda
-    "$HOME"/miniforge3/bin/conda init bash
+    curl -fsSL https://pixi.sh/install.sh | sh
+    # Add pixi to PATH for current session
+    export PATH="$HOME/.pixi/bin:$PATH"
+    # Add to bashrc for future sessions
+    echo 'export PATH="$HOME/.pixi/bin:$PATH"' >> ~/.bashrc
 fi
-
-# Setup PATH
-# shellcheck disable=SC2016
-echo 'export PATH="$HOME/miniforge3/bin:$PATH"' >> ~/.bashrc
-export PATH="$HOME/miniforge3/bin:$PATH"
-
-# shellcheck disable=SC1090
-source ~/.bashrc
 
 echo "Cloning repository..."
 cd ~
 if [ -d "ftw-inference-api" ]; then
-    echo "Repository already exists, pulling latest changes..."
+    echo "Repository already exists, switching to branch $BRANCH..."
     cd ftw-inference-api
-    git pull
+    git fetch origin
+    git checkout "$BRANCH"
+    git pull origin "$BRANCH"
 else
-    git clone https://github.com/fieldsoftheworld/ftw-inference-api.git
+    git clone -b "$BRANCH" https://github.com/fieldsoftheworld/ftw-inference-api.git
     cd ftw-inference-api
 fi
 
-echo "Creating conda environment..."
-conda env create -f server/env.yml -y
+echo "Installing Pixi environment..."
+# Ensure pixi is in PATH for this command
+export PATH="$HOME/.pixi/bin:$PATH"
+pixi install
 
 echo "Downloading FTW model checkpoints..."
 mkdir -p server/data/uploads server/data/results server/data/models server/logs
@@ -74,11 +90,22 @@ for model in "${MODELS[@]}"; do
     fi
 done
 
-# Enable GPU in config (replace gpu: null with gpu: 0)
-sed -i 's/gpu: null/gpu: 0/' server/config/config.yaml
+# Create production environment file
+echo "Creating production environment configuration..."
+cat > /tmp/ftw-production.env << EOF
+# Production Configuration
+PROCESSING__GPU=0
+CLOUDWATCH__ENABLED=true
+S3__ENABLED=true
+# SECURITY__SECRET_KEY=$(openssl rand -hex 32)
+SECURITY__AUTH_DISABLED=true
+LOGGING__LEVEL=INFO
+EOF
 
-# Enable CloudWatch logging
-sed -i 's/enabled: false/enabled: true/' server/config/config.yaml
+# Move environment file to proper location
+sudo mkdir -p /etc/ftw-inference-api
+sudo mv /tmp/ftw-production.env /etc/ftw-inference-api/production.env
+sudo chown "$USER":"$USER" /etc/ftw-inference-api/production.env
 
 chmod +x server/run.py
 
@@ -86,6 +113,17 @@ echo "Creating systemd service..."
 APP_DIR="$(pwd)"
 USER="$(whoami)"
 HOME_DIR="$(eval echo ~$USER)"
+
+# Conditionally build the ExecStart command based on the GPU configuration.
+# We check the final destination of the production.env file.
+BASE_EXEC_START="${HOME_DIR}/.pixi/bin/pixi run --environment production python run.py --host 0.0.0.0 --port 8000"
+EXEC_START_CMD=$BASE_EXEC_START
+
+if grep -q "PROCESSING__GPU=null" /etc/ftw-inference-api/production.env; then
+    echo "GPU is disabled. Applying CONDA_OVERRIDE_GLIBC to the service."
+    # Prepend the environment variable directly to the command.
+    EXEC_START_CMD="CONDA_OVERRIDE_GLIBC=2.17 ${BASE_EXEC_START}"
+fi
 
 sudo tee /etc/systemd/system/ftw-inference-api.service > /dev/null <<EOF
 [Unit]
@@ -97,7 +135,11 @@ Type=simple
 User=${USER}
 Group=${USER}
 WorkingDirectory=${APP_DIR}/server
-ExecStart=/bin/bash -c "cd ${APP_DIR}/server && source ${HOME_DIR}/miniforge3/bin/activate ftw-inference-api && python run.py --host 0.0.0.0 --port 8000"
+# Set a reliable PATH for the service environment.
+Environment="PATH=${HOME_DIR}/.pixi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+EnvironmentFile=/etc/ftw-inference-api/production.env
+# Use /bin/sh -c to correctly process the command string with the conditional variable.
+ExecStart=/bin/sh -c "${EXEC_START_CMD}"
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -135,7 +177,7 @@ sudo chown "$USER":"$USER" /var/log/ftw-inference-api
 echo "Enabling and starting the service..."
 sudo systemctl daemon-reload
 sudo systemctl enable ftw-inference-api
-sudo systemctl start ftw-inference-api
+sudo systemctl restart ftw-inference-api # Use restart to ensure changes are applied
 
 # Wait a moment for the service to start
 sleep 5
@@ -146,7 +188,7 @@ sudo systemctl status ftw-inference-api --no-pager
 echo "Deployment complete!"
 echo ""
 echo "Configuration:"
-echo "   GPU enabled (gpu: 0)"
+echo "   Check /etc/ftw-inference-api/production.env for current settings."
 echo ""
 echo "Service Management:"
 echo "  sudo systemctl status ftw-inference-api     # Check status"

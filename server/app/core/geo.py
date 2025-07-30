@@ -1,7 +1,7 @@
 import math
 
 
-def calculate_area_km2(bbox):
+def calculate_area_km2(bbox: list[float]) -> float:
     """
     Calculate the approximate area in square kilometers of a bounding box in EPSG:4326
 

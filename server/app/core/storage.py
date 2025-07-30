@@ -48,7 +48,10 @@ class S3Storage:
 
     def __init__(self, s3_config: S3Config) -> None:
         """Initialize S3 storage backend."""
-        self.bucket_name = s3_config.bucket_name
+        if s3_config.bucket_name is None:
+            raise ValueError("S3 bucket name is required but not configured")
+
+        self.bucket_name: str = s3_config.bucket_name
         self.region = s3_config.region
         self.presigned_url_expiry = s3_config.presigned_url_expiry
         self.session = aioboto3.Session()
@@ -87,7 +90,7 @@ class S3Storage:
                     ExpiresIn=expires_in,
                 )
                 logger.debug(f"Generated presigned URL for {key}")
-                return url
+                return str(url)
             except ClientError as e:
                 logger.error(f"Failed to generate presigned URL for {key}: {e}")
                 raise

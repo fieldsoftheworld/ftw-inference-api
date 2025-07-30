@@ -33,9 +33,9 @@ if __name__ == "__main__":
     settings = get_settings()
 
     # Override settings with command line arguments
-    host = args.host or settings.host
-    port = args.port or settings.port
-    debug = args.debug or settings.debug
+    host = args.host or settings.server.host
+    port = args.port or settings.server.port
+    debug = args.debug or settings.server.debug
 
     # Run server
     uvicorn.run("app.main:app", host=host, port=port, reload=debug)

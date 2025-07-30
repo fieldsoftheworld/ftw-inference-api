@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, File, Header, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
@@ -28,17 +30,17 @@ router = APIRouter()
 
 
 @router.get("/", response_model=RootResponse, status_code=status.HTTP_200_OK)
-async def get_root(project_service: ProjectServiceDep):
+async def get_root(project_service: ProjectServiceDep) -> Any:
     return project_service.get_api_configuration()
 
 
-@router.put("/example", status_code=status.HTTP_200_OK)
+@router.put("/example", response_model=None, status_code=status.HTTP_200_OK)
 async def example(
     params: ExampleWorkflowRequest,
     inference_service: InferenceServiceDep,
     auth: AuthDep,
     accept: str | None = Header(None),
-):
+) -> PlainTextResponse | JSONResponse:
     response = await inference_service.run_example_workflow(
         {
             "inference": params.inference.model_dump() if params.inference else None,
@@ -66,7 +68,7 @@ async def create_project(
     project_data: CreateProjectRequest,
     project_service: ProjectServiceDep,
     auth: AuthDep,
-):
+) -> Any:
     return project_service.create_project(project_data)
 
 
@@ -76,7 +78,7 @@ async def create_project(
 async def get_projects(
     project_service: ProjectServiceDep,
     auth: AuthDep,
-):
+) -> Any:
     projects = await project_service.get_projects()
     return {"projects": projects}
 
@@ -90,7 +92,7 @@ async def get_project(
     project_id: str,
     project_service: ProjectServiceDep,
     auth: AuthDep,
-):
+) -> Any:
     return await project_service.get_project(project_id)
 
 
@@ -99,7 +101,7 @@ async def delete_project(
     project_id: str,
     project_service: ProjectServiceDep,
     auth: AuthDep,
-):
+) -> None:
     await project_service.delete_project(project_id)
 
 
@@ -112,7 +114,7 @@ async def upload_image(
     project_service: ProjectServiceDep,
     auth: AuthDep,
     file: UploadFile = File(...),
-):
+) -> None:
     await project_service.upload_image(project_id, window, file)
 
 
@@ -160,13 +162,17 @@ async def polygonize(
     )
 
 
-@router.get("/projects/{project_id}/inference", status_code=status.HTTP_200_OK)
+@router.get(
+    "/projects/{project_id}/inference",
+    response_model=None,
+    status_code=status.HTTP_200_OK,
+)
 async def get_inference_results(
     project_id: str,
     project_service: ProjectServiceDep,
     auth: AuthDep,
     content_type: str | None = None,
-):
+) -> JSONResponse | FileResponse:
     response = await project_service.get_inference_results_response(
         project_id, content_type
     )

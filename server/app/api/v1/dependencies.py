@@ -14,12 +14,12 @@ from app.services.task_service import TaskService
 
 def get_queue_service(request: Request) -> QueueBackend:
     """Get queue service from app state"""
-    return request.app.state.queue
+    return request.app.state.queue  # type: ignore[no-any-return]
 
 
 def get_storage_service(request: Request) -> StorageBackend:
     """Get storage service from app state"""
-    return request.app.state.storage
+    return request.app.state.storage  # type: ignore[no-any-return]
 
 
 def get_task_service(queue: QueueBackend = Depends(get_queue_service)) -> TaskService:

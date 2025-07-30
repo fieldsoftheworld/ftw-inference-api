@@ -305,7 +305,7 @@ class ProjectService:
             await self.storage.download(geojson_result.file_path, temp_file)
 
             with open(temp_file) as f:
-                return json.load(f)
+                return dict(json.load(f))
 
     def get_inference_result_file_path(self, project_id: str) -> str:
         """Get file path for inference result image."""
@@ -318,7 +318,7 @@ class ProjectService:
                 detail="No image results found for this project",
             )
 
-        return image_result.file_path
+        return str(image_result.file_path)
 
     async def get_inference_results_response(
         self, project_id: str, content_type: str | None = None
@@ -367,11 +367,11 @@ class ProjectService:
         """Get API configuration for root endpoint."""
         settings = get_settings()
         return {
-            "api_version": settings.api_version,
-            "title": settings.api_title,
-            "description": settings.api_description,
-            "min_area_km2": settings.min_area_km2,
-            "max_area_km2": settings.max_area_km2,
+            "api_version": settings.api.version,
+            "title": settings.api.title,
+            "description": settings.api.description,
+            "min_area_km2": settings.processing.min_area_km2,
+            "max_area_km2": settings.processing.max_area_km2,
             "models": settings.models,
         }
 
@@ -379,7 +379,9 @@ class ProjectService:
 
     def _get_project_or_404(self, project_id: str) -> Project:
         """Get project by ID or raise 404 HTTPException if not found."""
-        project = self.db.query(Project).filter(Project.id == project_id).first()
+        project: Project | None = (
+            self.db.query(Project).filter(Project.id == project_id).first()
+        )
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

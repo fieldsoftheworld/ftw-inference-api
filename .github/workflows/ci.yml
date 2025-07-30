@@ -15,38 +15,20 @@ jobs:
           - ubuntu-latest
           # - macos-latest # ignore for now
           # - windows-latest # ignore for now
-        python-version:
-          - '3.11'
-          # - '3.12' # conflicts with env.yml python=3.11
-          # - '3.13' # doesn't work yet
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Set up Miniconda
-      uses: conda-incubator/setup-miniconda@v3
+    - name: Set up Pixi
+      uses: prefix-dev/setup-pixi@v0.8.3
       with:
-        python-version: ${{ matrix.python-version }}
-        environment-file: server/env.yml
-        activate-environment: ftw-inference-api
+        environments: test lint
+        cache: true
 
-    - name: Install pre-commit
-      run: pip install pre-commit
-      shell: bash -el {0}
+    - name: Run linting and format checks
+      run: pixi run -e lint lint
 
-    - name: Install dev dependencies
-      run: pip install -r server/requirements-dev.txt
-      shell: bash -el {0}
+    - name: Run tests with coverage
+      run: pixi run -e test test
 
-    - name: Download model(s)
-      run: |
-        mkdir -p server/data/models
-        curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
-
-    - name: Lint and format check with pre-commit
-      uses: pre-commit/action@v3.0.0
-
-    - name: Run tests
-      run: |
-        cd server
-        pytest -v --cov=app
-      shell: bash -el {0}
+    - name: Check code formatting
+      run: pixi run -e lint check
