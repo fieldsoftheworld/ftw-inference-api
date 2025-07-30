@@ -12,7 +12,7 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 
 2. Clone and setup:
    ```bash
-   git clone https://github.com/fieldsoftheworld/ftw-inference-api.git
+   git clone https://github.com/fieldsoftheworld/ftw-inference-api
    cd ftw-inference-api
    pixi install
    ```
