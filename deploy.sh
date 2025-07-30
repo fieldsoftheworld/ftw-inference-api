@@ -94,11 +94,11 @@ done
 echo "Creating production environment configuration..."
 cat > /tmp/ftw-production.env << EOF
 # Production Configuration
-PROCESSING__GPU=null
+PROCESSING__GPU=0
 CLOUDWATCH__ENABLED=true
 S3__ENABLED=true
-SECURITY__SECRET_KEY=$(openssl rand -hex 32)
-SECURITY__AUTH_DISABLED=false
+# SECURITY__SECRET_KEY=$(openssl rand -hex 32)
+SECURITY__AUTH_DISABLED=true
 LOGGING__LEVEL=INFO
 EOF
 
