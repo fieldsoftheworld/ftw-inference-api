@@ -4,7 +4,7 @@ Custom type adapters for Pydantic integration with Pendulum
 
 import datetime
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import pendulum
 from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
@@ -93,6 +93,9 @@ class PendulumDateTimeAnnotation:
             "description": "ISO8601 datetime with timezone (UTC)",
         }
 
+
+# Storage backend types
+StorageBackendType = Literal["local", "s3", "source_coop"]
 
 # Type for use in model fields
 PendulumDateTime = Annotated[pendulum.DateTime, PendulumDateTimeAnnotation]

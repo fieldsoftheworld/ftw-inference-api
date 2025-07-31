@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import aiofiles
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -190,7 +191,7 @@ class InferenceService:
         uid = str(uuid.uuid4())
 
         # Get the latest inference result for this project
-        inference_result = await self._get_latest_inference_result(project_id)
+        inference_result = self._get_latest_inference_result(project_id)
         if not inference_result:
             raise ValueError("No inference results found for this project")
 
@@ -221,8 +222,9 @@ class InferenceService:
                 polygonize_time = round((time.time() - polygonize_start) * 1000, 2)
                 total_time = round((time.time() - start_time) * 1000, 2)
 
-                with open(temp_polygon_file) as f:
-                    geojson_data = json.load(f)
+                async with aiofiles.open(temp_polygon_file) as f:
+                    geojson_content = await f.read()
+                    geojson_data = json.loads(geojson_content)
 
                 features = (
                     geojson_data.get("features", [])
@@ -306,8 +308,12 @@ class InferenceService:
                 inference_file, polygon_file, polygon_params, context
             )
 
-            with open(polygon_file) as f:
-                data: str | dict[str, Any] = f.read() if ndjson else json.load(f)
+            async with aiofiles.open(polygon_file) as f:
+                if ndjson:
+                    data: str | dict[str, Any] = await f.read()
+                else:
+                    content = await f.read()
+                    data = json.loads(content)
 
             if ndjson:
                 if isinstance(data, str):
@@ -404,9 +410,7 @@ class InferenceService:
         """Run inference using file-based image processing."""
         raise NotImplementedError("File-based processing not yet implemented")
 
-    async def _get_latest_inference_result(
-        self, project_id: str
-    ) -> InferenceResult | None:
+    def _get_latest_inference_result(self, project_id: str) -> InferenceResult | None:
         """Get the most recent inference result for a project."""
         result: InferenceResult | None = (
             self.db.query(InferenceResult)

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1 import router as v1_router
 from app.core.config import get_settings
+from app.core.config_validator import get_storage_backend_info, validate_configuration
 from app.core.logging import AppLogger, get_logger
 from app.core.middleware import LoggingMiddleware, SecurityHeadersMiddleware
 from app.core.queue import InMemoryQueue, QueueBackend, get_queue
@@ -42,13 +43,13 @@ def validation_exception_handler(
 
 
 # Application initialization functions
-async def initialize_logging() -> None:
+def initialize_logging() -> None:
     """Initialize application logging."""
     AppLogger()
     logger.info("Logging initialized")
 
 
-async def initialize_database() -> None:
+def initialize_database() -> None:
     """Initialize database and create tables."""
     try:
         create_db_and_tables()
@@ -58,7 +59,22 @@ async def initialize_database() -> None:
         raise
 
 
-async def initialize_services() -> tuple[StorageBackend, QueueBackend]:
+async def validate_application_config() -> None:
+    """Validate application configuration at startup."""
+    try:
+        settings = get_settings()
+        await validate_configuration(settings)
+
+        # Log storage backend information
+        backend_info = get_storage_backend_info(settings)
+        logger.info(f"Storage backend configuration: {backend_info}")
+
+    except Exception as e:
+        logger.error(f"Configuration validation failed: {e}")
+        raise
+
+
+def initialize_services() -> tuple[StorageBackend, QueueBackend]:
     """Initialize storage, task processors, and queue services."""
     try:
         settings = get_settings()
@@ -105,10 +121,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan management."""
     logger.info("Application starting up")
 
-    await initialize_logging()
-    await initialize_database()
+    initialize_logging()
+    await validate_application_config()
+    initialize_database()
 
-    storage, queue = await initialize_services()
+    storage, queue = initialize_services()
     setup_app_state(app, storage, queue)
 
     await start_background_workers(queue)

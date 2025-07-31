@@ -1,9 +1,9 @@
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -19,7 +19,7 @@ ENV_FILE_PATH = PROJECT_ROOT / ".env"
 
 
 class APIConfig(BaseModel):
-    """API metadata configuration"""
+    """API metadata configuration."""
 
     title: str = "Fields of the World - Inference API"
     description: str = "A service for field boundary inference from satellite images."
@@ -27,7 +27,7 @@ class APIConfig(BaseModel):
 
 
 class ServerConfig(BaseModel):
-    """Server runtime configuration"""
+    """Server runtime configuration."""
 
     host: str = "0.0.0.0"
     port: int = 8000
@@ -36,7 +36,7 @@ class ServerConfig(BaseModel):
 
 
 class CORSConfig(BaseModel):
-    """CORS configuration"""
+    """CORS configuration."""
 
     origins: list[str] = ["*"]
 
@@ -49,12 +49,12 @@ class CORSConfig(BaseModel):
 
 
 class SecurityConfig(BaseModel):
-    """Security and authentication configuration"""
+    """Security and authentication configuration."""
 
-    secret_key: str = ""
+    secret_key: str = "secret_key"  # Default for local dev
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    auth_disabled: bool = False
+    auth_disabled: bool = True  # Default to disabled for dev
 
     @field_validator("secret_key")
     @classmethod
@@ -71,7 +71,7 @@ class SecurityConfig(BaseModel):
 
 
 class ProcessingConfig(BaseModel):
-    """ML processing configuration"""
+    """ML processing configuration."""
 
     min_area_km2: float = 100.0
     max_area_km2: float = 500.0
@@ -81,7 +81,7 @@ class ProcessingConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
-    """Logging configuration"""
+    """Logging configuration."""
 
     level: str = "INFO"
     format: str = "json"
@@ -104,7 +104,7 @@ class LoggingConfig(BaseModel):
 
 
 class CloudWatchConfig(BaseModel):
-    """AWS CloudWatch configuration"""
+    """AWS CloudWatch configuration."""
 
     enabled: bool = False
     log_group: str = "/ftw-inference-api"
@@ -114,32 +114,54 @@ class CloudWatchConfig(BaseModel):
     max_batch_size: int = 10
 
 
-class S3Config(BaseModel):
-    """S3 storage configuration"""
+class LocalStorageConfig(BaseModel):
+    """Local filesystem storage configuration."""
 
-    enabled: bool = False
-    bucket_name: str | None = None
-    region: str = "us-west-2"
-    presigned_url_expiry: int = 3600
-
-    @field_validator("bucket_name")
-    @classmethod
-    def validate_bucket_name(cls, v: str | None, info: ValidationInfo) -> str | None:
-        if info.data.get("enabled") and not v:
-            raise ValueError("bucket_name is required when S3 is enabled")
-        return v
-
-
-class StorageConfig(BaseModel):
-    """Local storage configuration"""
-
+    backend: Literal["local"] = "local"
     output_dir: str = "data/results"
     temp_dir: str = "data/temp"
     max_file_size_mb: int = 100
 
 
+class _BaseS3Config(BaseModel):
+    """Base S3-compatible storage configuration."""
+
+    bucket_name: str
+    region: str | None = None
+    presigned_url_expiry: int = 3600
+
+
+class S3StorageConfig(_BaseS3Config):
+    """Standard AWS S3 storage configuration."""
+
+    backend: Literal["s3"] = "s3"
+
+
+class SourceCoopStorageConfig(_BaseS3Config):
+    """Source Coop S3-compatible storage configuration."""
+
+    backend: Literal["source_coop"] = "source_coop"
+    endpoint_url: str = "https://data.source.coop"
+    repository_path: str = "ftw-inference-output"
+
+    access_key_id: str | None = None
+    secret_access_key: str | None = None
+    use_secrets_manager: bool = False
+    secret_name: str = "ftw/source-coop/api-credentials"
+    secrets_manager_region: str | None = None
+    use_direct_s3: bool = False
+    direct_s3_bucket: str | None = None
+    direct_s3_region: str | None = None
+
+
+StorageConfig = Annotated[
+    LocalStorageConfig | S3StorageConfig | SourceCoopStorageConfig,
+    Field(discriminator="backend"),
+]
+
+
 class Settings(BaseSettings):
-    """Application settings with nested configuration support"""
+    """Application settings with nested configuration support."""
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE_PATH),
@@ -158,8 +180,8 @@ class Settings(BaseSettings):
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     cloudwatch: CloudWatchConfig = Field(default_factory=CloudWatchConfig)
-    s3: S3Config = Field(default_factory=S3Config)
-    storage: StorageConfig = Field(default_factory=StorageConfig)
+
+    storage: StorageConfig = Field(default_factory=LocalStorageConfig)
 
     models: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -183,7 +205,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Returns a cached instance of the Settings object"""
+    """Return cached Settings instance."""
     try:
         settings = Settings()
         return settings

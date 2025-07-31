@@ -90,6 +90,10 @@ exclude = [
     "^server/tests/.*$"
 ]
 
+[tool.bandit]
+exclude_dirs = ["server/tests"]
+skips = ["B101"]
+
 # Pixi configuration
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -144,7 +148,6 @@ httpx = ">=0.24.0"
 
 [tool.pixi.feature.test.pypi-dependencies]
 pytest-aioboto3 = "*"
-moto = { version = "*", extras = ["s3"] }
 
 [tool.pixi.feature.lint.dependencies]
 pre-commit = ">=3.3.2"
@@ -174,6 +177,10 @@ postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-
 
 # Setup tasks
 download-model = { cmd = "mkdir -p server/data/models && curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt", outputs = ["server/data/models/2_Class_FULL_FTW_Pretrained.ckpt"] }
+
+[dependency-groups]
+lint = ["mypy-boto3-s3>=1.39.5,<2"]
+test = ["moto>=5.1.9,<6", "pysonar>=1.1.0.2035,<2", "bandit[toml]>=1.8.6,<2"]
 
 # Feature-specific tasks
 [tool.pixi.feature.test.tasks]
