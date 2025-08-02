@@ -1,7 +1,3 @@
-"""
-Custom type adapters for Pydantic integration with Pendulum
-"""
-
 import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal
@@ -10,6 +6,7 @@ import pendulum
 from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
+from typing_extensions import TypedDict
 
 
 class TaskStatus(Enum):
@@ -94,8 +91,38 @@ class PendulumDateTimeAnnotation:
         }
 
 
+class LocalStorageInfo(TypedDict):
+    """Type for local storage backend information."""
+
+    backend: Literal["local"]
+    output_dir: str
+    temp_dir: str
+
+
+class S3StorageInfo(TypedDict):
+    """Type for S3 storage backend information."""
+
+    backend: Literal["s3"]
+    bucket_name: str
+    region: str | None
+
+
+class SourceCoopStorageInfo(TypedDict):
+    """Type for Source Coop storage backend information."""
+
+    backend: Literal["source_coop"]
+    endpoint_url: str
+    bucket_name: str
+    repository_path: str
+    use_secrets_manager: bool
+    use_direct_s3: bool
+
+
 # Storage backend types
 StorageBackendType = Literal["local", "s3", "source_coop"]
+
+# Union type for all storage backend info
+StorageBackendInfo = LocalStorageInfo | S3StorageInfo | SourceCoopStorageInfo
 
 # Type for use in model fields
 PendulumDateTime = Annotated[pendulum.DateTime, PendulumDateTimeAnnotation]

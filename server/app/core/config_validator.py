@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Any
 
-from app.core.config import Settings
+from app.core.config import Settings, StorageConfig
 from app.core.logging import get_logger
 from app.core.secrets import get_secrets_manager
+from app.core.types import StorageBackendInfo
 
 logger = get_logger(__name__)
 
@@ -52,7 +52,7 @@ class ConfigValidator:
         self._validate_secrets_manager_config(config)
         self._warn_on_conflicting_credentials(config)
 
-    def _validate_direct_s3_config(self, config: Any) -> None:
+    def _validate_direct_s3_config(self, config: StorageConfig) -> None:
         """Validate direct S3 configuration settings."""
         if not config.use_direct_s3:
             return
@@ -72,7 +72,7 @@ class ConfigValidator:
             if not getattr(config, field_name):
                 self.errors.append(error_msg)
 
-    def _validate_secrets_manager_config(self, config: Any) -> None:
+    def _validate_secrets_manager_config(self, config: StorageConfig) -> None:
         """Validate Secrets Manager or local credentials configuration."""
         if config.use_secrets_manager:
             required_fields = [
@@ -103,7 +103,7 @@ class ConfigValidator:
             if not getattr(config, field_name):
                 self.errors.append(error_msg)
 
-    def _warn_on_conflicting_credentials(self, config: Any) -> None:
+    def _warn_on_conflicting_credentials(self, config: StorageConfig) -> None:
         """Warn if both Secrets Manager and local credentials are configured."""
         if config.use_secrets_manager and (
             config.access_key_id or config.secret_access_key
@@ -180,7 +180,7 @@ async def validate_configuration(settings: Settings) -> None:
     await validator.validate_all()
 
 
-def get_storage_backend_info(settings: Settings) -> dict[str, Any]:
+def get_storage_backend_info(settings: Settings) -> StorageBackendInfo:
     """Get information about the active storage backend."""
     storage_config = settings.storage
 
