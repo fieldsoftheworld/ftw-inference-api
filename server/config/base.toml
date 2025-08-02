@@ -14,9 +14,9 @@ origins = ["*"]
 
 [security]
 # IMPORTANT: Change this secret_key in production via SECURITY__SECRET_KEY environment variable
-# For the secret_key "dev_secret_key_change_in_production_32chars", you can use the following JWT for testing:
+# For the secret_key "secret_key", you can use the following JWT for testing:
 # eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJndWVzdCIsIm5hbWUiOiJHdWVzdCIsImlhdCI6MTc0ODIxNzYwMCwiZXhwaXJlcyI6OTk5OTk5OTk5OX0.lJIkuuSdE7ihufZwWtLx10D_93ygWUcUrtKhvlh6M8k
-secret_key = "dev_secret_key_change_in_production_32chars"
+secret_key = "secret_key"
 auth_disabled = true
 algorithm = "HS256"
 access_token_expire_minutes = 30
