@@ -20,7 +20,7 @@ async def test_full_inference_success_workflow(client: TestClient, db_session):
 
     inference_params = {
         "model": "2_Class_FULL_FTW_Pretrained",
-        "images": ["http://example.com/a.tif", "http://example.com/b.tif"],
+        "images": ["https://example.com/a.tif", "https://example.com/b.tif"],
     }
     submit_response = client.put(
         f"/v1/projects/{project_id}/inference", json=inference_params
@@ -72,7 +72,7 @@ async def test_task_failure_reporting(client: TestClient, mock_queue, db_session
         f"/v1/projects/{project_id}/inference",
         json={
             "model": "2_Class_FULL_FTW_Pretrained",
-            "images": ["http://a.com/1.tif", "http://b.com/2.tif"],
+            "images": ["https://a.com/1.tif", "https://b.com/2.tif"],
         },
     )
     task_id = submit_response.json()["task_id"]
@@ -109,7 +109,7 @@ async def test_inference_with_invalid_model(client: TestClient):
 
     inference_params = {
         "model": "this-model-does-not-exist",
-        "images": ["http://example.com/a.tif", "http://example.com/b.tif"],
+        "images": ["https://example.com/a.tif", "https://example.com/b.tif"],
     }
     submit_response = client.put(
         f"/v1/projects/{project_id}/inference", json=inference_params

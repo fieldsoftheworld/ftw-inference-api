@@ -1,5 +1,4 @@
 import json
-import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
@@ -11,13 +10,81 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.core.storage import StorageBackend, temp_file_context
+from app.core.storage import StorageBackend, temp_files_context
 from app.core.types import ProjectStatus, TaskType
 from app.models.project import Image, InferenceResult, Project
 from app.schemas import CreateProjectRequest, ProjectResponse, ProjectResultLinks
 from app.services.task_service import TaskService
 
 logger = get_logger(__name__)
+
+
+def _clean_parameters_for_response(parameters: Any) -> dict[str, Any]:
+    """Clean parameters for API response, excluding large fields."""
+    params_dict = _normalize_parameters(parameters)
+    if not params_dict:
+        return {}
+
+    clean_params: dict[str, Any] = {}
+    _process_inference_params(params_dict, clean_params)
+    _copy_direct_params(params_dict, clean_params)
+    return clean_params
+
+
+def _normalize_parameters(parameters: Any) -> dict[str, Any]:
+    """Convert parameters to dictionary format."""
+    if isinstance(parameters, dict):
+        return parameters
+    result: dict[str, Any] = (
+        parameters.model_dump() if hasattr(parameters, "model_dump") else {}
+    )
+    return result
+
+
+def _process_inference_params(
+    params_dict: dict[str, Any], clean_params: dict[str, Any]
+) -> None:
+    """Process inference-specific parameters."""
+    inf_params = params_dict.get("inference")
+    if not inf_params:
+        return
+
+    clean_params["inference"] = {k: v for k, v in inf_params.items() if k != "images"}
+
+    _process_model_field(inf_params, clean_params["inference"])
+    _process_images_count(inf_params, clean_params["inference"])
+
+
+def _process_model_field(
+    inf_params: dict[str, Any], clean_inference: dict[str, Any]
+) -> None:
+    """Process model field, cleaning checkpoint paths."""
+    model_value = inf_params.get("model")
+    if not model_value:
+        return
+
+    if isinstance(model_value, str) and model_value.endswith(".ckpt"):
+        clean_inference["model"] = model_value.split("/")[-1].replace(".ckpt", "")
+    else:
+        clean_inference["model"] = model_value
+
+
+def _process_images_count(
+    inf_params: dict[str, Any], clean_inference: dict[str, Any]
+) -> None:
+    """Add images count instead of full images data."""
+    images = inf_params.get("images")
+    if images:
+        clean_inference["images_count"] = len(images)
+
+
+def _copy_direct_params(
+    params_dict: dict[str, Any], clean_params: dict[str, Any]
+) -> None:
+    """Copy parameters that don't need processing."""
+    for key in ["polygons", "task_id", "polygonize_task_id"]:
+        if key in params_dict:
+            clean_params[key] = params_dict[key]
 
 
 class ProjectService:
@@ -47,7 +114,7 @@ class ProjectService:
             status=project.status,
             progress=project.progress,
             created_at=project.created_at,
-            parameters=project.parameters,
+            parameters=_clean_parameters_for_response(project.parameters),
             results=clean_results,
         )
 
@@ -65,7 +132,7 @@ class ProjectService:
                 status=project.status,
                 progress=project.progress,
                 created_at=project.created_at,
-                parameters=project.parameters,
+                parameters=_clean_parameters_for_response(project.parameters),
                 results=clean_results,
             )
             clean_projects.append(clean_project)
@@ -89,7 +156,7 @@ class ProjectService:
             "project_id": project_id,
             "status": project.status,
             "progress": project.progress,
-            "parameters": project.parameters,
+            "parameters": _clean_parameters_for_response(project.parameters),
         }
 
     async def get_complete_project_status(
@@ -140,10 +207,10 @@ class ProjectService:
                 detail="Storage backend not configured",
             )
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".tif") as temp_file:
-            temp_path = Path(temp_file.name)
-
-        async with aiofiles.open(temp_path, "wb") as temp_file:
+        async with aiofiles.tempfile.NamedTemporaryFile(
+            delete=False, suffix=".tif"
+        ) as temp_file:
+            temp_path = Path(str(temp_file.name))
             content = await file.read()
             await temp_file.write(content)
 
@@ -301,11 +368,13 @@ class ProjectService:
                 detail="No GeoJSON results found for this project",
             )
 
-        async with temp_file_context(f"geojson_{project_id}.json") as temp_file:
+        async with temp_files_context(f"geojson_{project_id}.json") as temp_files:
+            temp_file = temp_files[0]
             await self.storage.download(geojson_result.file_path, temp_file)
 
-            with open(temp_file) as f:
-                return dict(json.load(f))
+            async with aiofiles.open(temp_file) as f:
+                content = await f.read()
+                return dict(json.loads(content))
 
     def get_inference_result_file_path(self, project_id: str) -> str:
         """Get file path for inference result image."""

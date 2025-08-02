@@ -52,48 +52,6 @@ class ProjectResponse(BaseModel):
             return iso_str
         return str(dt) if dt is not None else ""
 
-    @field_serializer("parameters")
-    def serialize_parameters(self, parameters: Any) -> dict[str, Any]:
-        """Clean parameters for API response, excluding large fields."""
-        if isinstance(parameters, dict):
-            params_dict = parameters
-        else:
-            params_dict = (
-                parameters.model_dump() if hasattr(parameters, "model_dump") else {}
-            )
-
-        if not params_dict:
-            return {}
-
-        clean_params = {}
-
-        if "inference" in params_dict:
-            inf_params = params_dict["inference"]
-            if inf_params:
-                clean_params["inference"] = {
-                    k: v for k, v in inf_params.items() if k != "images"
-                }
-
-                if "model" in inf_params:
-                    model_value = inf_params["model"]
-                    if isinstance(model_value, str) and model_value.endswith(".ckpt"):
-                        clean_params["inference"]["model"] = model_value.split("/")[
-                            -1
-                        ].replace(".ckpt", "")
-                    else:
-                        clean_params["inference"]["model"] = model_value
-
-                if "images" in inf_params:
-                    clean_params["inference"]["images_count"] = len(
-                        inf_params["images"]
-                    )
-
-        for key in ["polygons", "task_id", "polygonize_task_id"]:
-            if key in params_dict:
-                clean_params[key] = params_dict[key]
-
-        return clean_params
-
 
 class ProjectsResponse(BaseModel):
     """Response model for a list of projects."""

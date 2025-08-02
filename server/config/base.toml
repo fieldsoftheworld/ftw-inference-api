@@ -14,9 +14,9 @@ origins = ["*"]
 
 [security]
 # IMPORTANT: Change this secret_key in production via SECURITY__SECRET_KEY environment variable
-# For the secret_key "dev_secret_key_change_in_production_32chars", you can use the following JWT for testing:
+# For the secret_key "secret_key", you can use the following JWT for testing:
 # eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJndWVzdCIsIm5hbWUiOiJHdWVzdCIsImlhdCI6MTc0ODIxNzYwMCwiZXhwaXJlcyI6OTk5OTk5OTk5OX0.lJIkuuSdE7ihufZwWtLx10D_93ygWUcUrtKhvlh6M8k
-secret_key = "dev_secret_key_change_in_production_32chars"
+secret_key = "secret_key"
 auth_disabled = true
 algorithm = "HS256"
 access_token_expire_minutes = 30
@@ -40,16 +40,33 @@ region = "us-west-2"
 send_interval = 30
 max_batch_size = 10
 
-[s3]
-enabled = true
+[storage]
+# Storage backend type: "local", "s3", or "source_coop"
+backend = "local"
+
+# Local storage settings (used when backend = "local")
+output_dir = "data/results"
+temp_dir = "data/temp"
+max_file_size_mb = 1000
+
+# S3/Source Coop settings (used when backend = "s3" or "source_coop")
 bucket_name = "dev-ftw-api-model-outputs-2140860f"
 region = "us-west-2"
 presigned_url_expiry = 3600
 
-[storage]
-output_dir = "data/results"
-temp_dir = "data/temp"
-max_file_size_mb = 1000
+# Source Coop specific settings (used when backend = "source_coop")
+endpoint_url = "https://data.source.coop"
+repository_path = "ftw-inference-output"
+access_key_id = ""
+secret_access_key = ""
+use_secrets_manager = false
+secret_name = "ftw/source-coop/api-credentials"
+secrets_manager_region = "us-west-2"
+
+# Direct S3 access (alternative for source_coop)
+use_direct_s3 = false
+direct_s3_bucket = ""
+direct_s3_region = ""
 
 # Models configuration
 [[models]]
