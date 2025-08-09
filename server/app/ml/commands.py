@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Any
 
+from app.ml.validation import resolve_model_path
+
 
 def build_download_command(
     image_file: Path, win_a: str, win_b: str, bbox: list[float]
@@ -37,7 +39,7 @@ def build_inference_command(
         "--out",
         str(inference_file.absolute()),
         "--model",
-        params["model"],
+        resolve_model_path(params["model"]),
         "--resize_factor",
         str(params["resize_factor"]),
     ]
