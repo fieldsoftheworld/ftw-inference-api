@@ -111,12 +111,12 @@ class TestProjectServiceWithStorage:
 
     def test_project_service_storage_integration(self, mock_storage, mock_db):
         """Test that ProjectService correctly uses storage backend."""
-        service = ProjectService(mock_storage, mock_db)
+        service = ProjectService(mock_storage)
         assert service.storage is mock_storage
 
     async def test_project_cleanup_calls_storage(self, mock_storage, mock_db):
         """Test that project cleanup calls storage methods."""
-        service = ProjectService(mock_storage, mock_db)
+        service = ProjectService(mock_storage)
 
         mock_storage.list_files.return_value = [
             "projects/test-123/uploads/a/file1.tif",

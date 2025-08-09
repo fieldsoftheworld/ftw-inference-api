@@ -7,30 +7,10 @@ from app.core.auth import verify_auth
 from app.core.config import LocalStorageConfig
 from app.core.queue import QueueBackend
 from app.core.storage import LocalStorage
-from app.db.database import Base, get_db
+from app.db.database import create_tables
 from app.main import app
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def override_get_db():
-    """Override the get_db dependency for testing."""
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from moto import mock_aws
 
 
 def override_verify_auth():
@@ -39,21 +19,11 @@ def override_verify_auth():
 
 
 @pytest.fixture(scope="function")
-def test_db():
-    """Create and tear down test database."""
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture(scope="function")
-def db_session():
-    """Provide a single database session for a test function."""
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def dynamodb_tables():
+    """Create mock DynamoDB tables for testing."""
+    with mock_aws():
+        create_tables()
+        yield
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -68,9 +38,8 @@ async def mock_queue():
 
 
 @pytest.fixture(scope="function")
-def client(test_db, mock_queue, tmp_path):
+def client(dynamodb_tables, mock_queue, tmp_path):
     """Create a test client with overridden dependencies."""
-    app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[verify_auth] = override_verify_auth
     app.dependency_overrides[get_storage_service] = lambda: LocalStorage(
         LocalStorageConfig(output_dir=str(tmp_path))
