@@ -7,7 +7,6 @@ version = "0.1.0"
 host = "0.0.0.0"
 port = 8000
 debug = false
-database_url = "sqlite:///./data/ftw_inference.db"
 
 [cors]
 origins = ["*"]
@@ -40,9 +39,14 @@ region = "us-west-2"
 send_interval = 30
 max_batch_size = 10
 
+[dynamodb]
+aws_region = "us-west-2"
+# dynamodb_endpoint = "http://localhost:8001"  # Uncomment for local development, comment out for AWS
+table_prefix = "dev-ftw-"
+
 [storage]
 # Storage backend type: "local", "s3", or "source_coop"
-backend = "local"
+backend = "s3"
 
 # Local storage settings (used when backend = "local")
 output_dir = "data/results"

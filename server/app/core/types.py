@@ -1,12 +1,23 @@
 import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import pendulum
 from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema, core_schema
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from app.core.queue import QueueBackend
+    from app.core.storage import StorageBackend
+
+
+class AppState(TypedDict):
+    """Type-safe container for FastAPI application state."""
+
+    queue: "QueueBackend"
+    storage: "StorageBackend"
 
 
 class TaskStatus(Enum):
