@@ -208,7 +208,11 @@ class LocalStorage:
                 await dst.write(chunk)
         logger.info(f"Downloaded {source_path} to {local_path}")
 
-    async def get_url(self, key: str, expires_in: int = 3600) -> str:
+    async def get_url(
+        self,
+        key: str,
+        expires_in: int = 3600,
+    ) -> str:
         """Get file URL (file:// for local storage)."""
         file_path = self.base_dir / key
         if not await aiofiles.os.path.exists(file_path):

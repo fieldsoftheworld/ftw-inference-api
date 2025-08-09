@@ -53,6 +53,30 @@ sudo journalctl -u ftw-inference-api --since today  # Today's logs
 
 ## Running the Server in Development Mode
 
+### Prerequisites
+
+- [Docker](https://www.docker.com/get-started) (required for DynamoDB Local)
+
+### Development Setup
+
+1. **Setup DynamoDB Local** (required for development):
+   ```bash
+   # Copy example environment file and configure local DynamoDB
+   cp .env.example .env
+   # Edit .env to uncomment DynamoDB local settings:
+   # DYNAMODB__DYNAMODB_ENDPOINT="http://localhost:8001"
+   # AWS_ACCESS_KEY_ID="fake_key_id"
+   # AWS_SECRET_ACCESS_KEY="fake_secret_key"
+   ```
+
+2. **Start services**:
+   ```bash
+   pixi run dynamodb-local  # Start DynamoDB Local (port 8001)
+   pixi run start           # Start development server (port 8000)
+   ```
+
+### Alternative: Direct Server Start
+
 ```bash
 pixi run start  # Development server with debug mode and auto reload
 ```
@@ -123,8 +147,7 @@ server/
 │   ├── ml/                     # ML pipeline and validation
 │   ├── core/                   # Infrastructure (auth, config, storage)
 │   ├── schemas/                # Pydantic request/response models
-│   ├── models/                 # Database models
-│   ├── db/                     # Database connection and utilities
+│   ├── db/                     # Database models and connection
 │   └── main.py                 # FastAPI application setup
 ├── config/                     # Configuration files
 ├── data/                       # ML models, results, temp files
