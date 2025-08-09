@@ -15,7 +15,7 @@ from app.core.middleware import LoggingMiddleware, SecurityHeadersMiddleware
 from app.core.queue import InMemoryQueue, QueueBackend, get_queue
 from app.core.storage import StorageBackend, get_storage
 from app.core.task_processors import get_task_processors
-from app.db.database import create_db_and_tables
+from app.db.database import create_tables, verify_tables
 
 logger = get_logger(__name__)
 
@@ -50,10 +50,15 @@ def initialize_logging() -> None:
 
 
 def initialize_database() -> None:
-    """Initialize database and create tables."""
+    """Initialize DynamoDB tables."""
     try:
-        create_db_and_tables()
-        logger.info("Database initialized")
+        settings = get_settings()
+        if settings.dynamodb.dynamodb_endpoint:  # Local development
+            create_tables()
+            logger.info("DynamoDB tables created for local development")
+        else:  # Production
+            verify_tables()
+            logger.info("DynamoDB tables verified")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
@@ -110,8 +115,8 @@ async def stop_background_workers(queue: QueueBackend) -> None:
 
 def setup_app_state(app: FastAPI, storage: StorageBackend, queue: QueueBackend) -> None:
     """Setup application state with initialized services."""
-    app.state.queue = queue  # type: ignore[attr-defined]
-    app.state.storage = storage  # type: ignore[attr-defined]
+    app.state.queue = queue
+    app.state.storage = storage
     logger.info("Application state configured")
 
 
@@ -135,9 +140,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     logger.info("Application shutting down")
-
-    await stop_background_workers(app.state.queue)  # type: ignore[attr-defined]
-
+    await stop_background_workers(app.state.queue)
     logger.info("Application shutdown complete")
 
 

@@ -5,15 +5,19 @@ from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy.orm import Session
-from sqlalchemy.orm.attributes import flag_modified
+from pynamodb.exceptions import DoesNotExist
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.storage import StorageBackend, temp_files_context
 from app.core.types import ProjectStatus, TaskType
-from app.models.project import Image, InferenceResult, Project
-from app.schemas import CreateProjectRequest, ProjectResponse, ProjectResultLinks
+from app.db.models import Image, InferenceResult, Project
+from app.schemas import (
+    CreateProjectRequest,
+    ProjectResponse,
+    ProjectResultLinks,
+    ProjectStatusResponse,
+)
 from app.services.task_service import TaskService
 
 logger = get_logger(__name__)
@@ -58,14 +62,9 @@ def _process_inference_params(
 def _process_model_field(
     inf_params: dict[str, Any], clean_inference: dict[str, Any]
 ) -> None:
-    """Process model field, cleaning checkpoint paths."""
+    """Process model field (model IDs are now always clean)."""
     model_value = inf_params.get("model")
-    if not model_value:
-        return
-
-    if isinstance(model_value, str) and model_value.endswith(".ckpt"):
-        clean_inference["model"] = model_value.split("/")[-1].replace(".ckpt", "")
-    else:
+    if model_value:
         clean_inference["model"] = model_value
 
 
@@ -88,65 +87,45 @@ def _copy_direct_params(
 
 
 class ProjectService:
-    def __init__(self, storage: StorageBackend, db: Session):
-        """Initialize ProjectService with storage backend and database session."""
+    def __init__(self, storage: StorageBackend):
+        """Initialize ProjectService with storage backend only."""
         self.storage = storage
-        self.db = db
 
     # --- Public API: Project Lifecycle & Management ---
 
-    def create_project(self, project_data: CreateProjectRequest) -> Project:
-        """Create a new project."""
+    async def create_project(
+        self, project_data: CreateProjectRequest
+    ) -> ProjectResponse:
+        """Create a new project and return its response model."""
         new_project = Project(title=project_data.title)
-        self.db.add(new_project)
-        self.db.commit()
-        self.db.refresh(new_project)
-        return new_project
+        new_project.save()
+        return await self._map_project_to_response(new_project)
 
     async def get_project(self, project_id: str) -> ProjectResponse:
-        """Get a single project by ID with clean URLs."""
+        """Get a single project by ID."""
         project = self._get_project_or_404(project_id)
-        clean_results = await self._get_project_results_urls(project)
-
-        return ProjectResponse(
-            id=project.id,
-            title=project.title,
-            status=project.status,
-            progress=project.progress,
-            created_at=project.created_at,
-            parameters=_clean_parameters_for_response(project.parameters),
-            results=clean_results,
-        )
+        return await self._map_project_to_response(project)
 
     async def get_projects(self) -> list[ProjectResponse]:
-        """Get all projects with clean URLs."""
-        projects = self.db.query(Project).all()
-        clean_projects = []
-
-        for project in projects:
-            clean_results = await self._get_project_results_urls(project)
-
-            clean_project = ProjectResponse(
-                id=project.id,
-                title=project.title,
-                status=project.status,
-                progress=project.progress,
-                created_at=project.created_at,
-                parameters=_clean_parameters_for_response(project.parameters),
-                results=clean_results,
-            )
-            clean_projects.append(clean_project)
-
-        return clean_projects
+        """Get all projects."""
+        projects = list(Project.scan())
+        return [await self._map_project_to_response(p) for p in projects]
 
     async def delete_project(self, project_id: str) -> None:
         """Delete a project and all its associated storage files."""
         project = self._get_project_or_404(project_id)
 
-        await self._cleanup_project_files(project_id)
+        # Delete related records
+        images = list(Image.scan(Image.project_id == project_id))
+        for image in images:
+            image.delete()
 
-        self.db.delete(project)
-        self.db.commit()
+        results = list(InferenceResult.scan(InferenceResult.project_id == project_id))
+        for result in results:
+            result.delete()
+
+        await self._cleanup_project_files(project_id)
+        project.delete()
 
     def get_project_status(self, project_id: str) -> dict[str, Any]:
         """Get basic project status information."""
@@ -155,13 +134,13 @@ class ProjectService:
         return {
             "project_id": project_id,
             "status": project.status,
-            "progress": project.progress,
-            "parameters": _clean_parameters_for_response(project.parameters),
+            "progress": float(project.progress) if project.progress else None,
+            "parameters": _clean_parameters_for_response(project.parameters_dict),
         }
 
     async def get_complete_project_status(
         self, project_id: str, task_service: TaskService
-    ) -> dict[str, Any]:
+    ) -> ProjectStatusResponse:
         """Get complete project status with aggregated task info."""
         response_data = self.get_project_status(project_id)
 
@@ -179,13 +158,12 @@ class ProjectService:
             if poly_task_info:
                 response_data["polygonize_task"] = poly_task_info
 
-        return response_data
+        return ProjectStatusResponse(**response_data)
 
     def update_project_status(self, project_id: str, new_status: ProjectStatus) -> None:
         """Update project status."""
         project = self._get_project_or_404(project_id)
-        project.status = new_status
-        self.db.commit()
+        project.update(actions=[Project.status.set(new_status.value)])
 
     # --- Public API: File & Parameter Management ---
 
@@ -220,32 +198,42 @@ class ProjectService:
         finally:
             temp_path.unlink(missing_ok=True)
 
-        existing_image = (
-            self.db.query(Image)
-            .filter(Image.project_id == project_id, Image.window == window)
-            .first()
-        )
-
+        # Update or create image record
+        existing_image = Image.get_by_project_and_window(project_id, window)
         if existing_image:
-            existing_image.file_path = s3_key
-            self.db.commit()
-            self.db.refresh(existing_image)
+            existing_image.update(actions=[Image.file_path.set(s3_key)])
         else:
-            new_image = Image(project_id=project_id, window=window, file_path=s3_key)
-            self.db.add(new_image)
-            self.db.commit()
+            Image(project_id=project_id, window=window, file_path=s3_key).save()
 
     def update_project_inference_params(
         self, project_id: str, inference_params: dict[str, Any]
     ) -> None:
-        """Update inference parameters for a project and reset status to queued."""
-        self._update_project_params(project_id, "inference", inference_params)
+        """Update inference parameters for a project."""
+        project = self._get_project_or_404(project_id)
+        params = project.parameters_dict
+        params["inference"] = inference_params
+        project.update(
+            actions=[
+                Project.parameters.set(json.dumps(params)),
+                Project.status.set(ProjectStatus.QUEUED.value),
+                Project.progress.set(None),
+            ]
+        )
 
     def update_project_polygon_params(
         self, project_id: str, polygon_params: dict[str, Any]
     ) -> None:
-        """Update polygon parameters for a project and reset status to queued."""
-        self._update_project_params(project_id, "polygons", polygon_params)
+        """Update polygon parameters for a project."""
+        project = self._get_project_or_404(project_id)
+        params = project.parameters_dict
+        params["polygons"] = polygon_params
+        project.update(
+            actions=[
+                Project.parameters.set(json.dumps(params)),
+                Project.status.set(ProjectStatus.QUEUED.value),
+                Project.progress.set(None),
+            ]
+        )
 
     def set_project_task_id(
         self, project_id: str, task_id: str, task_type: TaskType = TaskType.INFERENCE
@@ -257,23 +245,26 @@ class ProjectService:
             if task_type == TaskType.INFERENCE
             else f"{task_type.value}_task_id"
         )
-        project.parameters[key] = task_id
-        flag_modified(project, "parameters")
-        self.db.commit()
+        params = project.parameters_dict
+        params[key] = task_id
+        project.update(actions=[Project.parameters.set(json.dumps(params))])
 
     def record_task_completion(
         self, project_id: str, task_type: TaskType, result_data: dict
     ) -> None:
-        """Record task completion with all database updates in single transaction."""
+        """Record task completion with atomic update."""
         project = self._get_project_or_404(project_id)
-        self.db.refresh(project)
 
-        # Determine result metadata based on task type
+        # Determine result metadata
         if task_type == TaskType.INFERENCE:
             result_key = "inference"
             file_key = "inference_key"
             file_check_key = "inference_file"
-            model_id = result_data.get("model", "unknown")
+            # Get model from project parameters, fallback to result data, then "unknown"
+            params = project.parameters_dict
+            model_id = params.get("inference", {}).get(
+                "model", result_data.get("model", "unknown")
+            )
             result_type = "image"
         elif task_type == TaskType.POLYGONIZE:
             result_key = "polygons"
@@ -287,18 +278,16 @@ class ProjectService:
         if result_data.get(file_check_key):
             # Create InferenceResult record
             file_path = result_data.get(file_key, result_data[file_check_key])
-            inference_result = InferenceResult(
+            InferenceResult(
                 project_id=project.id,
                 model_id=model_id,
                 result_type=result_type,
                 file_path=file_path,
-            )
-            self.db.add(inference_result)
+            ).save()
 
-            if not project.results:
-                project.results = {}
-
-            project.results[result_key] = {
+            # Update project results
+            results = project.results_dict
+            results[result_key] = {
                 "file_path": result_data[file_key],
                 "metrics": {
                     k: v
@@ -306,11 +295,13 @@ class ProjectService:
                     if k not in [file_check_key, file_key]
                 },
             }
-            flag_modified(project, "results")
 
-        project.status = ProjectStatus.COMPLETED
-        self.db.commit()
-        self.db.refresh(project)
+            project.update(
+                actions=[
+                    Project.results.set(json.dumps(results)),
+                    Project.status.set(ProjectStatus.COMPLETED.value),
+                ]
+            )
 
     # --- Public API: Results & Configuration ---
 
@@ -318,7 +309,7 @@ class ProjectService:
         """Get inference results for a completed project."""
         project = self._get_project_or_404(project_id)
 
-        if project.status != "completed":
+        if project.status != ProjectStatus.COMPLETED.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
@@ -327,24 +318,12 @@ class ProjectService:
                 ),
             )
 
-        results = (
-            self.db.query(InferenceResult)
-            .filter(InferenceResult.project_id == project_id)
-            .order_by(InferenceResult.created_at.desc())
-            .all()
+        image_result = InferenceResult.get_latest_by_project_and_type(
+            project_id, "image"
         )
-
-        image_result = None
-        geojson_result = None
-
-        for result in results:
-            if result.result_type == "image" and image_result is None:
-                image_result = result
-            elif result.result_type == "geojson" and geojson_result is None:
-                geojson_result = result
-
-            if image_result and geojson_result:
-                break
+        geojson_result = InferenceResult.get_latest_by_project_and_type(
+            project_id, "geojson"
+        )
 
         if not image_result and not geojson_result:
             raise HTTPException(
@@ -448,26 +427,29 @@ class ProjectService:
 
     def _get_project_or_404(self, project_id: str) -> Project:
         """Get project by ID or raise 404 HTTPException if not found."""
-        project: Project | None = (
-            self.db.query(Project).filter(Project.id == project_id).first()
-        )
-        if not project:
+        try:
+            project: Project = Project.get(project_id)
+            return project
+        except DoesNotExist as err:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Project with ID {project_id} not found",
-            )
-        return project
+            ) from err
 
     def _update_project_params(
         self, project_id: str, param_key: str, params: dict[str, Any]
     ) -> None:
         """Update project parameters and reset status to queued."""
         project = self._get_project_or_404(project_id)
-        project.parameters[param_key] = params
-        flag_modified(project, "parameters")
-        project.status = ProjectStatus.QUEUED
-        project.progress = None
-        self.db.commit()
+        parameters = project.parameters_dict
+        parameters[param_key] = params
+        project.update(
+            actions=[
+                Project.parameters.set(json.dumps(parameters)),
+                Project.status.set(ProjectStatus.QUEUED.value),
+                Project.progress.set(None),
+            ]
+        )
 
     async def _safe_get_url(self, file_path: str | None) -> str | None:
         """Safely get URL for file path, returning None on any error."""
@@ -485,18 +467,19 @@ class ProjectService:
         inference_url = None
         polygons_url = None
 
-        if project.results:
+        results = project.results_dict
+        if results:
             # Handle inference results
-            if project.results.get("inference"):
-                inference_data = project.results["inference"]
+            if results.get("inference"):
+                inference_data = results["inference"]
                 if isinstance(inference_data, dict):
                     inference_url = await self._safe_get_url(
                         inference_data.get("file_path")
                     )
 
             # Handle polygon results
-            if project.results.get("polygons"):
-                polygons_data = project.results["polygons"]
+            if results.get("polygons"):
+                polygons_data = results["polygons"]
                 if isinstance(polygons_data, dict):
                     polygons_url = await self._safe_get_url(
                         polygons_data.get("file_path")
@@ -505,6 +488,20 @@ class ProjectService:
         return ProjectResultLinks(
             inference=inference_url,
             polygons=polygons_url,
+        )
+
+    async def _map_project_to_response(self, project: Project) -> ProjectResponse:
+        """Maps a Project DB model to a ProjectResponse Pydantic model."""
+        clean_results = await self._get_project_results_urls(project)
+
+        return ProjectResponse(
+            id=project.id,
+            title=project.title,
+            status=ProjectStatus(project.status),
+            progress=float(project.progress) if project.progress else None,
+            created_at=project.created_at_pendulum,
+            parameters=_clean_parameters_for_response(project.parameters_dict),
+            results=clean_results,
         )
 
     async def _cleanup_project_files(self, project_id: str) -> None:

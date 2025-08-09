@@ -99,6 +99,13 @@ class TaskDetailsResponse(BaseModel):
     result: dict[str, Any] | None = None
 
 
+class InferenceResultsResponse(BaseModel):
+    """Response model for inference results with URLs."""
+
+    inference: str | None = Field(None, description="URL to inference TIF result")
+    polygons: str | None = Field(None, description="URL to GeoJSON polygons result")
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
 
