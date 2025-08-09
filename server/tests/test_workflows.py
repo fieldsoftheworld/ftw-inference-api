@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.mark.asyncio
-async def test_full_inference_success_workflow(client: TestClient, db_session):
+async def test_full_inference_success_workflow(client: TestClient, dynamodb_tables):
     """Test complete inference workflow from task submission to result retrieval."""
     create_response = client.post(
         "/v1/projects", json={"title": "Workflow Success Test"}
@@ -35,7 +35,7 @@ async def test_full_inference_success_workflow(client: TestClient, db_session):
 
     # Manually trigger completion since background tasks aren't running
     storage_mock = client.app.dependency_overrides[get_storage_service]()  # type: ignore[attr-defined]
-    project_service = ProjectService(storage=storage_mock, db=db_session)
+    project_service = ProjectService(storage=storage_mock)
     project_service.record_task_completion(
         project_id, TaskType.INFERENCE, mock_result_data
     )
@@ -62,7 +62,7 @@ async def test_full_inference_success_workflow(client: TestClient, db_session):
 
 
 @pytest.mark.asyncio
-async def test_task_failure_reporting(client: TestClient, mock_queue, db_session):
+async def test_task_failure_reporting(client: TestClient, mock_queue, dynamodb_tables):
     """Test that task failures are properly reported to the user."""
     create_response = client.post(
         "/v1/projects", json={"title": "Workflow Failure Test"}
@@ -89,7 +89,7 @@ async def test_task_failure_reporting(client: TestClient, mock_queue, db_session
     mock_queue.get_status.return_value = failed_task_info
 
     storage_mock = client.app.dependency_overrides[get_storage_service]()  # type: ignore[attr-defined]
-    project_service = ProjectService(storage=storage_mock, db=db_session)
+    project_service = ProjectService(storage=storage_mock)
     project_service.update_project_status(project_id, ProjectStatus.FAILED)
 
     status_response = client.get(f"/v1/projects/{project_id}/status")

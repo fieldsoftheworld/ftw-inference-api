@@ -13,6 +13,7 @@ from app.ml.pipeline import (
 )
 from app.ml.validation import (
     prepare_inference_params,
+    resolve_model_path,
     validate_bbox,
     validate_image_urls,
     validate_model,
@@ -26,6 +27,7 @@ __all__ = [
     "download_images",
     "execute_inference_pipeline",
     "prepare_inference_params",
+    "resolve_model_path",
     "run_inference",
     "run_polygonize",
     "validate_bbox",

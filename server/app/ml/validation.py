@@ -86,7 +86,24 @@ def validate_model(params: dict[str, Any]) -> None:
     if not model_path.exists():
         raise ValueError(f"Model file not found at '{model_path}'")
 
-    params["model"] = str(model_path.absolute())
+
+def resolve_model_path(model_id: str) -> str:
+    """Resolve model ID to absolute file path for ML execution."""
+    settings = get_settings()
+
+    model_config = next(
+        (model for model in settings.models if model.get("id") == model_id),
+        None,
+    )
+    if not model_config:
+        raise ValueError(f"Model with ID '{model_id}' not found")
+
+    model_file = model_config.get("file")
+    if not model_file:
+        raise ValueError(f"Model '{model_id}' has no file specified")
+
+    model_path = Path(__file__).parent.parent.parent / "data" / "models" / model_file
+    return str(model_path.absolute())
 
 
 def validate_processing_params(params: dict[str, Any]) -> None:

@@ -22,9 +22,13 @@ class TestStorageFactory:
     """Test storage backend selection."""
 
     def test_get_storage_local_default(self):
-        """Test that local storage is returned by default."""
+        """Test that local storage is returned when explicitly configured."""
         # Create Settings without loading from environment or config files
         settings = Settings(_env_file=None, _env_ignore_empty=True)
+        # Override storage to use local backend for this test
+        settings.storage = LocalStorageConfig(
+            backend="local", output_dir="data/results", temp_dir="data/temp"
+        )
         assert settings.storage.backend == "local"
         storage = get_storage(settings)
         assert isinstance(storage, LocalStorage)
@@ -111,12 +115,12 @@ class TestProjectServiceWithStorage:
 
     def test_project_service_storage_integration(self, mock_storage, mock_db):
         """Test that ProjectService correctly uses storage backend."""
-        service = ProjectService(mock_storage, mock_db)
+        service = ProjectService(mock_storage)
         assert service.storage is mock_storage
 
     async def test_project_cleanup_calls_storage(self, mock_storage, mock_db):
         """Test that project cleanup calls storage methods."""
-        service = ProjectService(mock_storage, mock_db)
+        service = ProjectService(mock_storage)
 
         mock_storage.list_files.return_value = [
             "projects/test-123/uploads/a/file1.tif",

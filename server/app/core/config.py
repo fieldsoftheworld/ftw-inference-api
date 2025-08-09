@@ -32,7 +32,6 @@ class ServerConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
-    database_url: str = "sqlite:///./data/ftw_inference.db"
 
 
 class CORSConfig(BaseModel):
@@ -114,6 +113,14 @@ class CloudWatchConfig(BaseModel):
     max_batch_size: int = 10
 
 
+class DynamoDBConfig(BaseModel):
+    """DynamoDB configuration."""
+
+    aws_region: str = "us-west-2"
+    dynamodb_endpoint: str | None = None  # For local development
+    table_prefix: str = "ftw-"
+
+
 class LocalStorageConfig(BaseModel):
     """Local filesystem storage configuration."""
 
@@ -180,6 +187,7 @@ class Settings(BaseSettings):
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     cloudwatch: CloudWatchConfig = Field(default_factory=CloudWatchConfig)
+    dynamodb: DynamoDBConfig = Field(default_factory=DynamoDBConfig)
 
     storage: StorageConfig = Field(default_factory=LocalStorageConfig)
 

@@ -6,7 +6,6 @@ from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.geo import calculate_area_km2
@@ -14,13 +13,13 @@ from app.core.logging import get_logger
 from app.core.storage import StorageBackend, temp_files_context
 from app.core.types import TaskType
 from app.core.utils import run_async
+from app.db.models import InferenceResult
 from app.ml import (
     build_polygonize_command,
     execute_inference_pipeline,
     prepare_inference_params,
     run_polygonize,
 )
-from app.models.project import InferenceResult
 from app.services.project_service import ProjectService
 from app.services.task_service import TaskService
 
@@ -33,12 +32,10 @@ class InferenceService:
     def __init__(
         self,
         storage: StorageBackend,
-        db: Session,
         project_service: ProjectService,
         task_service: TaskService | None = None,
     ):
         self.storage = storage
-        self.db = db
         self.project_service = project_service
         self.task_service = task_service
 
@@ -149,9 +146,12 @@ class InferenceService:
     ) -> str:
         """Submit polygonize workflow for a project and return task_id."""
         try:
-            self.project_service.update_project_polygon_params(project_id, params)
+            poly_params = params
+            self.project_service.update_project_polygon_params(project_id, poly_params)
             assert self.task_service is not None
-            task_id = await self.task_service.submit_polygonize_task(project_id, params)
+            task_id = await self.task_service.submit_polygonize_task(
+                project_id, poly_params
+            )
             self.project_service.set_project_task_id(
                 project_id, task_id, TaskType.POLYGONIZE
             )
@@ -412,14 +412,8 @@ class InferenceService:
 
     def _get_latest_inference_result(self, project_id: str) -> InferenceResult | None:
         """Get the most recent inference result for a project."""
-        result: InferenceResult | None = (
-            self.db.query(InferenceResult)
-            .filter(
-                InferenceResult.project_id == project_id,
-                InferenceResult.result_type == "image",
-            )
-            .order_by(InferenceResult.created_at.desc())
-            .first()
+        result: InferenceResult | None = InferenceResult.get_latest_by_project_and_type(
+            project_id, "image"
         )
         return result
 

@@ -1,29 +1,23 @@
-from collections.abc import Generator
+from app.db.models import Image, InferenceResult, Project
+from app.db.protocols import DynamoTable
 
-from sqlalchemy import (
-    create_engine,
-)
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
-
-from app.core.config import get_settings
-
-# Create SQLAlchemy engine and base
-engine = create_engine(
-    get_settings().server.database_url, connect_args={"check_same_thread": False}
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+TABLES: tuple[type[DynamoTable], ...] = (Image, InferenceResult, Project)
+LOCAL_CAPACITY = 1
 
 
-def get_db() -> Generator[Session, None, None]:
-    """Dependency for database session"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def create_tables() -> None:
+    """Create DynamoDB tables for local development."""
+    for table in TABLES:
+        if not table.exists():
+            table.create_table(
+                read_capacity_units=LOCAL_CAPACITY,
+                write_capacity_units=LOCAL_CAPACITY,
+                wait=True,
+            )
 
 
-def create_db_and_tables() -> None:
-    """Create all tables in the database"""
-    Base.metadata.create_all(bind=engine)
+def verify_tables() -> None:
+    """Verify tables exist in production."""
+    for table in TABLES:
+        if not table.exists():
+            raise RuntimeError(f"Table {table.Meta.table_name} does not exist")

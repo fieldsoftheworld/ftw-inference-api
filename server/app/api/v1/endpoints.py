@@ -31,16 +31,18 @@ router = APIRouter()
 
 @router.get("/", response_model=RootResponse, status_code=status.HTTP_200_OK)
 async def get_root(project_service: ProjectServiceDep) -> Any:
+    """Get API configuration and available endpoints."""
     return project_service.get_api_configuration()
 
 
-@router.put("/example", response_model=None, status_code=status.HTTP_200_OK)
+@router.put("/example", response_model=RootResponse, status_code=status.HTTP_200_OK)
 async def example(
     params: ExampleWorkflowRequest,
     inference_service: InferenceServiceDep,
     auth: AuthDep,
     accept: str | None = Header(None),
 ) -> PlainTextResponse | JSONResponse:
+    """Run example workflow with inference and polygonization."""
     response = await inference_service.run_example_workflow(
         {
             "inference": params.inference.model_dump() if params.inference else None,
@@ -68,8 +70,9 @@ async def create_project(
     project_data: CreateProjectRequest,
     project_service: ProjectServiceDep,
     auth: AuthDep,
-) -> Any:
-    return project_service.create_project(project_data)
+) -> ProjectResponse:
+    """Create a new project with the provided configuration."""
+    return await project_service.create_project(project_data)
 
 
 @router.get(
@@ -78,9 +81,10 @@ async def create_project(
 async def get_projects(
     project_service: ProjectServiceDep,
     auth: AuthDep,
-) -> Any:
+) -> ProjectsResponse:
+    """Retrieve all projects for the authenticated user."""
     projects = await project_service.get_projects()
-    return {"projects": projects}
+    return ProjectsResponse(projects=projects)
 
 
 @router.get(
@@ -92,7 +96,8 @@ async def get_project(
     project_id: str,
     project_service: ProjectServiceDep,
     auth: AuthDep,
-) -> Any:
+) -> ProjectResponse:
+    """Retrieve a specific project by ID."""
     return await project_service.get_project(project_id)
 
 
@@ -102,6 +107,7 @@ async def delete_project(
     project_service: ProjectServiceDep,
     auth: AuthDep,
 ) -> None:
+    """Delete a project and all associated data."""
     await project_service.delete_project(project_id)
 
 
@@ -115,6 +121,7 @@ async def upload_image(
     auth: AuthDep,
     file: UploadFile = File(...),
 ) -> None:
+    """Upload satellite image for a specific project window."""
     await project_service.upload_image(project_id, window, file)
 
 
@@ -129,6 +136,7 @@ async def inference(
     inference_service: InferenceServiceDep,
     auth: AuthDep,
 ) -> TaskSubmissionResponse:
+    """Submit ML inference task for field boundary detection."""
     task_id = await inference_service.submit_project_inference_workflow(
         project_id, params.model_dump()
     )
@@ -151,6 +159,7 @@ async def polygonize(
     inference_service: InferenceServiceDep,
     auth: AuthDep,
 ) -> TaskSubmissionResponse:
+    """Submit polygonization task to convert raster results to vector polygons."""
     task_id = await inference_service.submit_project_polygonize_workflow(
         project_id, params.model_dump()
     )
@@ -173,6 +182,7 @@ async def get_inference_results(
     auth: AuthDep,
     content_type: str | None = None,
 ) -> JSONResponse | FileResponse:
+    """Retrieve inference results as GeoJSON or file download."""
     response = await project_service.get_inference_results_response(
         project_id, content_type
     )
@@ -200,10 +210,8 @@ async def get_project_status(
     task_service: TaskServiceDep,
     auth: AuthDep,
 ) -> ProjectStatusResponse:
-    response_data = await project_service.get_complete_project_status(
-        project_id, task_service
-    )
-    return ProjectStatusResponse(**response_data)
+    """Get comprehensive project status including task progress."""
+    return await project_service.get_complete_project_status(project_id, task_service)
 
 
 @router.get(
@@ -217,10 +225,12 @@ async def get_task_status(
     task_service: TaskServiceDep,
     auth: AuthDep,
 ) -> TaskDetailsResponse:
+    """Get detailed status and metadata for a specific task."""
     task_details = await task_service.get_task_details(project_id, task_id)
     return TaskDetailsResponse(**task_details)
 
 
 @router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
 async def health_check() -> HealthResponse:
+    """Check API health status."""
     return HealthResponse(status="healthy")

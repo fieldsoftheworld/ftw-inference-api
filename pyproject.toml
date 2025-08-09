@@ -94,6 +94,23 @@ exclude = [
 exclude_dirs = ["server/tests"]
 skips = ["B101"]
 
+[tool.coverage.run]
+source = ["app"]
+branch = true
+relative_files = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
 # Pixi configuration
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -123,8 +140,8 @@ aioboto3 = ">=14.0.0"
 # Data and validation
 pydantic = ">=2.11.7"
 pydantic-settings = ">=2.10.0"
-sqlalchemy = ">=2.0"
 pendulum = ">=3.0.0"
+pynamodb = ">=6.1.0,<7"
 
 # Utilities
 python-multipart = ">=0.0.6"
@@ -176,7 +193,12 @@ start = { cmd = "python run.py --debug", cwd = "server", depends-on = ["postinst
 postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-check -e ."
 
 # Setup tasks
-download-model = { cmd = "mkdir -p server/data/models && curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt", outputs = ["server/data/models/2_Class_FULL_FTW_Pretrained.ckpt"] }
+download-model = { cmd = """
+mkdir -p server/data/models && \
+curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt \
+https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
+""", outputs = ["server/data/models/2_Class_FULL_FTW_Pretrained.ckpt"] }
+dynamodb-local = { cmd = "docker run -p 8001:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb -inMemory" }
 
 [dependency-groups]
 lint = ["mypy-boto3-s3>=1.39.5,<2"]
@@ -184,7 +206,12 @@ test = ["moto>=5.1.9,<6", "pysonar>=1.1.0.2035,<2", "bandit[toml]>=1.8.6,<2"]
 
 # Feature-specific tasks
 [tool.pixi.feature.test.tasks]
-test = { cmd = "pytest -v --cov=app", cwd = "server", depends-on = ["postinstall", "download-model"] }
+test = { cmd = """
+pytest -v \
+  --cov=app \
+  --cov-report=xml \
+  --cov-report=term-missing
+""", cwd = "server", depends-on = ["postinstall", "download-model"] }
 
 [tool.pixi.feature.lint.tasks]
 lint = { cmd = "pre-commit run --all-files", depends-on = ["postinstall"] }
