@@ -246,8 +246,10 @@ class InferenceService:
                     s3_key=polygon_key,
                 )
 
+                polygon_file_url = await self.storage.get_url(polygon_key)
+
                 return {
-                    "polygon_file": polygon_key,
+                    "polygon_file": polygon_file_url,
                     "polygon_key": polygon_key,
                     "polygonize_time_ms": polygonize_time,
                     "total_time_ms": total_time,
@@ -391,8 +393,10 @@ class InferenceService:
                     **result,
                 )
 
+                inference_file_url = await self.storage.get_url(inference_key)
+
                 return {
-                    "inference_file": inference_key,
+                    "inference_file": inference_file_url,
                     "inference_key": inference_key,
                     "image_file": str(temp_image_file),
                     **result,

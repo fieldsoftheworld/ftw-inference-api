@@ -1,5 +1,4 @@
 import contextlib
-from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -8,14 +7,10 @@ import aioboto3
 import aiofiles
 import aiofiles.os
 import aiofiles.tempfile
+from aiobotocore.config import AioConfig
 from botocore.exceptions import ClientError
 
-from app.core.config import (
-    LocalStorageConfig,
-    S3StorageConfig,
-    Settings,
-    SourceCoopStorageConfig,
-)
+from app.core.config import Settings, StorageConfig
 from app.core.logging import get_logger
 from app.core.secrets import get_secrets_manager
 
@@ -36,7 +31,7 @@ class StorageBackend(Protocol):
         """Download file to local path."""
         ...
 
-    async def get_url(self, key: str, expires_in: int = 3600) -> str:
+    async def get_url(self, key: str) -> str:
         """Get presigned/accessible URL for file."""
         ...
 
@@ -53,130 +48,14 @@ class StorageBackend(Protocol):
         ...
 
 
-class _BaseS3Storage(StorageBackend, ABC):
-    """Abstract base class for S3-based storage with common logic."""
-
-    def __init__(self) -> None:
-        """Initialize the base S3 storage."""
-        self.bucket_name: str = ""
-        self.presigned_url_expiry: int = 3600
-        self._session: aioboto3.Session | None = None
-
-    @abstractmethod
-    @contextlib.asynccontextmanager
-    async def _get_s3_client(self) -> "AsyncGenerator[S3Client, None]":
-        """Yield a configured S3 client context."""
-        yield
-
-    async def upload(self, local_path: Path, key: str) -> str:
-        """Upload file to S3 and return the S3 key."""
-        async with self._get_s3_client() as s3:
-            try:
-                await s3.upload_file(str(local_path), self.bucket_name, key)
-                logger.info(f"Uploaded {local_path} to s3://{self.bucket_name}/{key}")
-                return key
-            except ClientError as e:
-                logger.error(f"Failed to upload {local_path} to S3: {e}")
-                raise
-
-    async def download(self, key: str, local_path: Path) -> None:
-        """Download file from S3 to local path."""
-        async with self._get_s3_client() as s3:
-            try:
-                await s3.download_file(self.bucket_name, key, str(local_path))
-                logger.info(f"Downloaded s3://{self.bucket_name}/{key} to {local_path}")
-            except ClientError as e:
-                logger.error(f"Failed to download {key} from S3: {e}")
-                raise
-
-    async def get_url(self, key: str, expires_in: int = 3600) -> str:
-        """Generate presigned URL for file access."""
-        effective_expires_in = (
-            expires_in if expires_in > 0 else self.presigned_url_expiry
-        )
-        async with self._get_s3_client() as s3:
-            try:
-                url = await s3.generate_presigned_url(
-                    "get_object",
-                    Params={"Bucket": self.bucket_name, "Key": key},
-                    ExpiresIn=effective_expires_in,
-                )
-                logger.debug(f"Generated presigned URL for {key}")
-                return str(url)
-            except ClientError as e:
-                logger.error(f"Failed to generate presigned URL for {key}: {e}")
-                raise
-
-    async def delete(self, key: str) -> None:
-        """Delete file from S3."""
-        async with self._get_s3_client() as s3:
-            try:
-                await s3.delete_object(Bucket=self.bucket_name, Key=key)
-                logger.info(f"Deleted s3://{self.bucket_name}/{key}")
-            except ClientError as e:
-                logger.error(f"Failed to delete {key} from S3: {e}")
-                raise
-
-    async def list_files(self, prefix: str) -> list[str]:
-        """List files with given prefix in S3."""
-        async with self._get_s3_client() as s3:
-            try:
-                paginator = s3.get_paginator("list_objects_v2")
-                keys: list[str] = []
-                async for result in paginator.paginate(
-                    Bucket=self.bucket_name, Prefix=prefix
-                ):
-                    keys.extend(
-                        content["Key"] for content in result.get("Contents", [])
-                    )
-                return keys
-            except ClientError as e:
-                logger.error(f"Failed to list files with prefix {prefix}: {e}")
-                raise
-
-    async def file_exists(self, key: str) -> bool:
-        """Check if file exists in S3."""
-        async with self._get_s3_client() as s3:
-            try:
-                await s3.head_object(Bucket=self.bucket_name, Key=key)
-                return True
-            except ClientError as e:
-                if e.response["Error"]["Code"] == "404":
-                    return False
-                logger.error(f"Failed to check if {key} exists: {e}")
-                raise
-
-
-class S3Storage(_BaseS3Storage):
-    """Standard S3 implementation of StorageBackend."""
-
-    def __init__(self, s3_config: S3StorageConfig) -> None:
-        """Initialize S3 storage backend."""
-        super().__init__()
-        if not s3_config.bucket_name:
-            raise ValueError("S3 bucket name is required but not configured")
-
-        self.bucket_name = s3_config.bucket_name
-        self.presigned_url_expiry = s3_config.presigned_url_expiry
-        self._session = aioboto3.Session(region_name=s3_config.region)
-
-    @contextlib.asynccontextmanager
-    async def _get_s3_client(self) -> "AsyncGenerator[S3Client, None]":
-        """Yield a standard S3 client context."""
-        if not self._session:
-            raise RuntimeError("S3 session not initialized.")
-        async with self._session.client("s3") as s3:
-            yield s3
-
-
 class LocalStorage:
     """Local filesystem implementation of StorageBackend."""
 
-    def __init__(self, local_config: LocalStorageConfig) -> None:
+    def __init__(self, storage_config: StorageConfig) -> None:
         """Initialize local storage backend."""
-        self.base_dir = Path(local_config.output_dir)
+        self.base_dir = Path(storage_config.output_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.max_file_size_mb = local_config.max_file_size_mb
+        self.max_file_size_mb = storage_config.max_file_size_mb
 
     async def upload(self, local_path: Path, key: str) -> str:
         """Copy file to storage directory and return the key."""
@@ -211,13 +90,17 @@ class LocalStorage:
     async def get_url(
         self,
         key: str,
-        expires_in: int = 3600,
     ) -> str:
-        """Get file URL (file:// for local storage)."""
-        file_path = self.base_dir / key
-        if not await aiofiles.os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {key}")
-        return file_path.as_uri()
+        """Get file URL (file:// for local storage)"""
+        try:
+            file_path = self.base_dir / key
+            if not await aiofiles.os.path.exists(file_path):
+                logger.warning(f"File not found for URL generation: {key}")
+                return key
+            return file_path.as_uri()
+        except Exception as e:
+            logger.warning(f"Could not generate URL for {key}: {e}")
+            return key
 
     async def delete(self, key: str) -> None:
         """Delete file from local storage."""
@@ -249,15 +132,15 @@ class LocalStorage:
         return await aiofiles.os.path.exists(self.base_dir / key)
 
 
-class SourceCoopStorage(_BaseS3Storage):
+class SourceCoopStorage:
     """Source Coop S3-compatible storage with lazy credential loading."""
 
-    def __init__(self, source_coop_config: SourceCoopStorageConfig) -> None:
+    def __init__(self, storage_config: StorageConfig) -> None:
         """Initialize Source Coop storage backend."""
-        super().__init__()
-        self.config = source_coop_config
-        self.presigned_url_expiry = source_coop_config.presigned_url_expiry
+        self.config = storage_config.source_coop
         self._initialized = False
+        self.bucket_name: str = ""
+        self._session: aioboto3.Session | None = None
 
     async def _lazy_init(self) -> None:
         """Load credentials and configure S3 client on first use."""
@@ -280,16 +163,9 @@ class SourceCoopStorage(_BaseS3Storage):
             self._access_key_id = self.config.access_key_id
             self._secret_access_key = self.config.secret_access_key
 
-        if self.config.use_direct_s3:
-            if not self.config.direct_s3_bucket:
-                raise ValueError("Direct S3 bucket name is required but not configured")
-            self.bucket_name = self.config.direct_s3_bucket
-            self._region = self.config.direct_s3_region
-            self._endpoint_url = None
-        else:
-            self.bucket_name = self.config.bucket_name
-            self._region = self.config.region
-            self._endpoint_url = self.config.endpoint_url
+        self.bucket_name = self.config.bucket_name
+        self._region = self.config.region
+        self._endpoint_url = self.config.endpoint_url
 
         self._session = aioboto3.Session()
         self._initialized = True
@@ -302,12 +178,19 @@ class SourceCoopStorage(_BaseS3Storage):
         if not self._session:
             raise RuntimeError("Source Coop session not initialized.")
 
+        # Configure checksum calculation for Source Coop compatibility
+        source_coop_config = AioConfig(
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        )
+
         async with self._session.client(
             "s3",
             region_name=self._region,
             endpoint_url=self._endpoint_url,
             aws_access_key_id=self._access_key_id,
             aws_secret_access_key=self._secret_access_key,
+            config=source_coop_config,
         ) as s3:
             yield s3
 
@@ -326,39 +209,91 @@ class SourceCoopStorage(_BaseS3Storage):
         return storage_key
 
     async def upload(self, local_path: Path, key: str) -> str:
-        """Upload file, adding the repository path prefix."""
-        await super().upload(local_path, self._get_storage_key(key))
-        return key
+        """Upload file to Source Coop and return the key."""
+        storage_key = self._get_storage_key(key)
+        async with self._get_s3_client() as s3:
+            try:
+                await s3.upload_file(str(local_path), self.bucket_name, storage_key)
+                logger.info(
+                    f"Uploaded {local_path} to s3://{self.bucket_name}/{storage_key}"
+                )
+                return key
+            except ClientError as e:
+                logger.error(f"Failed to upload {local_path} to Source Coop: {e}")
+                raise
 
     async def download(self, key: str, local_path: Path) -> None:
-        """Download file, adding the repository path prefix."""
-        await super().download(self._get_storage_key(key), local_path)
+        """Download file from Source Coop to local path."""
+        storage_key = self._get_storage_key(key)
+        async with self._get_s3_client() as s3:
+            try:
+                await s3.download_file(self.bucket_name, storage_key, str(local_path))
+                logger.info(
+                    f"Downloaded s3://{self.bucket_name}/{storage_key} to {local_path}"
+                )
+            except ClientError as e:
+                logger.error(f"Failed to download {key} from Source Coop: {e}")
+                raise
 
-    async def get_url(self, key: str, expires_in: int = 3600) -> str:
-        """Get URL for file, adding the repository path prefix."""
-        return await super().get_url(self._get_storage_key(key), expires_in)
+    async def get_url(self, key: str) -> str:
+        """Generate clean Source Coop URL for file access"""
+        try:
+            await self._lazy_init()  # Ensure we have bucket_name
+            storage_key = self._get_storage_key(key)
+
+            url = f"{self._endpoint_url}/{self.bucket_name}/{storage_key}"
+            logger.debug(f"Generated Source Coop URL for {key}: {url}")
+            return url
+        except Exception as e:
+            logger.warning(f"Could not generate URL for {key}: {e}")
+            return key
 
     async def delete(self, key: str) -> None:
-        """Delete file, adding the repository path prefix."""
-        await super().delete(self._get_storage_key(key))
+        """Delete file from Source Coop."""
+        storage_key = self._get_storage_key(key)
+        async with self._get_s3_client() as s3:
+            try:
+                await s3.delete_object(Bucket=self.bucket_name, Key=storage_key)
+                logger.info(f"Deleted s3://{self.bucket_name}/{storage_key}")
+            except ClientError as e:
+                logger.error(f"Failed to delete {key} from Source Coop: {e}")
+                raise
 
     async def list_files(self, prefix: str) -> list[str]:
-        """List files, adding repository path prefix and stripping from results."""
+        """List files with given prefix in Source Coop."""
         storage_prefix = self._get_storage_key(prefix)
-        storage_keys = await super().list_files(storage_prefix)
-        return [self._strip_repository_path(key) for key in storage_keys]
+        async with self._get_s3_client() as s3:
+            try:
+                paginator = s3.get_paginator("list_objects_v2")
+                keys: list[str] = []
+                async for result in paginator.paginate(
+                    Bucket=self.bucket_name, Prefix=storage_prefix
+                ):
+                    keys.extend(
+                        content["Key"] for content in result.get("Contents", [])
+                    )
+                return [self._strip_repository_path(key) for key in keys]
+            except ClientError as e:
+                logger.error(f"Failed to list files with prefix {prefix}: {e}")
+                raise
 
     async def file_exists(self, key: str) -> bool:
-        """Check file existence, adding the repository path prefix."""
-        return await super().file_exists(self._get_storage_key(key))
+        """Check if file exists in Source Coop."""
+        storage_key = self._get_storage_key(key)
+        async with self._get_s3_client() as s3:
+            try:
+                await s3.head_object(Bucket=self.bucket_name, Key=storage_key)
+                return True
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "404":
+                    return False
+                logger.error(f"Failed to check if {key} exists: {e}")
+                raise
 
 
 def get_storage(settings: Settings) -> StorageBackend:
     """Get storage backend based on the unified configuration."""
     storage_config = settings.storage
-
-    if storage_config.backend == "s3":
-        return S3Storage(storage_config)
 
     if storage_config.backend == "source_coop":
         return SourceCoopStorage(storage_config)

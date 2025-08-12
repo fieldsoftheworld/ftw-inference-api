@@ -9,12 +9,11 @@ import aiofiles.tempfile
 import pytest
 import pytest_asyncio
 from app.core.config import (
-    LocalStorageConfig,
-    S3StorageConfig,
     Settings,
-    SourceCoopStorageConfig,
+    SourceCoopConfig,
+    StorageConfig,
 )
-from app.core.storage import LocalStorage, S3Storage, SourceCoopStorage, get_storage
+from app.core.storage import LocalStorage, SourceCoopStorage, get_storage
 from app.services.project_service import ProjectService
 
 
@@ -26,27 +25,21 @@ class TestStorageFactory:
         # Create Settings without loading from environment or config files
         settings = Settings(_env_file=None, _env_ignore_empty=True)
         # Override storage to use local backend for this test
-        settings.storage = LocalStorageConfig(
-            backend="local", output_dir="data/results", temp_dir="data/temp"
-        )
+        settings.storage = StorageConfig(backend="local", output_dir="data/results")
         assert settings.storage.backend == "local"
         storage = get_storage(settings)
         assert isinstance(storage, LocalStorage)
 
-    def test_get_storage_s3_enabled(self):
-        """Test that S3 storage is returned when S3 backend is set."""
-        settings = Settings()
-        settings.storage = S3StorageConfig(bucket_name="test-bucket")
-        storage = get_storage(settings)
-        assert isinstance(storage, S3Storage)
-
     def test_get_storage_source_coop_enabled(self):
         """Test that Source Coop storage is returned when enabled."""
-        settings = Settings()
-        settings.storage = SourceCoopStorageConfig(
-            bucket_name="test-bucket",
-            access_key_id="test_key",
-            secret_access_key="test_secret",
+        settings = Settings(_env_file=None, _env_ignore_empty=True)
+        settings.storage = StorageConfig(
+            backend="source_coop",
+            source_coop=SourceCoopConfig(
+                bucket_name="test-bucket",
+                access_key_id="test_key",
+                secret_access_key="test_secret",
+            ),
         )
         storage = get_storage(settings)
         assert isinstance(storage, SourceCoopStorage)
@@ -59,7 +52,8 @@ class TestLocalStorage:
     async def local_storage(self):
         """Create a local storage instance with temp directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield LocalStorage(LocalStorageConfig(output_dir=str(temp_dir)))
+            storage_config = StorageConfig(output_dir=str(temp_dir))
+            yield LocalStorage(storage_config)
 
     async def test_upload_download_cycle(self, local_storage):
         """Test basic upload/download functionality."""
