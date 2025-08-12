@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1 import router as v1_router
 from app.core.config import get_settings
-from app.core.config_validator import get_storage_backend_info, validate_configuration
 from app.core.logging import AppLogger, get_logger
 from app.core.middleware import LoggingMiddleware, SecurityHeadersMiddleware
 from app.core.queue import InMemoryQueue, QueueBackend, get_queue
@@ -64,21 +63,6 @@ def initialize_database() -> None:
         raise
 
 
-async def validate_application_config() -> None:
-    """Validate application configuration at startup."""
-    try:
-        settings = get_settings()
-        await validate_configuration(settings)
-
-        # Log storage backend information
-        backend_info = get_storage_backend_info(settings)
-        logger.info(f"Storage backend configuration: {backend_info}")
-
-    except Exception as e:
-        logger.error(f"Configuration validation failed: {e}")
-        raise
-
-
 def initialize_services() -> tuple[StorageBackend, QueueBackend]:
     """Initialize storage, task processors, and queue services."""
     try:
@@ -127,7 +111,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application starting up")
 
     initialize_logging()
-    await validate_application_config()
     initialize_database()
 
     storage, queue = initialize_services()

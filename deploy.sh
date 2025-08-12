@@ -90,14 +90,12 @@ for model in "${MODELS[@]}"; do
     fi
 done
 
-# Create production environment file
-echo "Creating production environment configuration..."
+# Create minimal production environment file (optional customizations)
+echo "Creating minimal production environment configuration..."
 cat > /tmp/ftw-production.env << EOF
-# Production Configuration
+# Production Configuration - Add any environment variable overrides here
+# The application will use base.toml defaults unless overridden
 PROCESSING__GPU=0
-CLOUDWATCH__ENABLED=true
-S3__ENABLED=true
-# SECURITY__SECRET_KEY=$(openssl rand -hex 32)
 SECURITY__AUTH_DISABLED=true
 LOGGING__LEVEL=INFO
 EOF
@@ -106,6 +104,9 @@ EOF
 sudo mkdir -p /etc/ftw-inference-api
 sudo mv /tmp/ftw-production.env /etc/ftw-inference-api/production.env
 sudo chown "$USER":"$USER" /etc/ftw-inference-api/production.env
+
+echo "Environment file created at /etc/ftw-inference-api/production.env"
+echo "Modify this file to override any settings from base.toml as needed"
 
 chmod +x server/run.py
 

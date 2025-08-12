@@ -45,32 +45,23 @@ aws_region = "us-west-2"
 table_prefix = "dev-ftw-"
 
 [storage]
-# Storage backend type: "local", "s3", or "source_coop"
-backend = "s3"
+backend = "source_coop" # "local" or "source_coop"
 
-# Local storage settings (used when backend = "local")
+# Local storage settings
 output_dir = "data/results"
-temp_dir = "data/temp"
 max_file_size_mb = 1000
 
-# S3/Source Coop settings (used when backend = "s3" or "source_coop")
-bucket_name = "dev-ftw-api-model-outputs-2140860f"
+[storage.source_coop]
+# Source Coop S3-compatible storage settings
+bucket_name = "ftw"
 region = "us-west-2"
-presigned_url_expiry = 3600
-
-# Source Coop specific settings (used when backend = "source_coop")
 endpoint_url = "https://data.source.coop"
 repository_path = "ftw-inference-output"
 access_key_id = ""
 secret_access_key = ""
-use_secrets_manager = false
+use_secrets_manager = true
 secret_name = "ftw/source-coop/api-credentials"
 secrets_manager_region = "us-west-2"
-
-# Direct S3 access (alternative for source_coop)
-use_direct_s3 = false
-direct_s3_bucket = ""
-direct_s3_region = ""
 
 # Models configuration
 [[models]]
