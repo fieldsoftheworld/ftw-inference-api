@@ -4,7 +4,7 @@ import pytest
 import pytest_asyncio
 from app.api.v1.dependencies import get_queue_service, get_storage_service
 from app.core.auth import verify_auth
-from app.core.config import LocalStorageConfig
+from app.core.config import StorageConfig
 from app.core.queue import QueueBackend
 from app.core.storage import LocalStorage
 from app.db.database import create_tables
@@ -42,7 +42,7 @@ def client(dynamodb_tables, mock_queue, tmp_path):
     """Create a test client with overridden dependencies."""
     app.dependency_overrides[verify_auth] = override_verify_auth
     app.dependency_overrides[get_storage_service] = lambda: LocalStorage(
-        LocalStorageConfig(output_dir=str(tmp_path))
+        StorageConfig(backend="local", output_dir=str(tmp_path))
     )
     app.dependency_overrides[get_queue_service] = lambda: mock_queue
 

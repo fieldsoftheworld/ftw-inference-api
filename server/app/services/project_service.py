@@ -452,15 +452,11 @@ class ProjectService:
         )
 
     async def _safe_get_url(self, file_path: str | None) -> str | None:
-        """Safely get URL for file path, returning None on any error."""
+        """Safely get URL for file path, returning None if no file path provided."""
         if not file_path:
             return None
 
-        try:
-            return await self.storage.get_url(file_path)
-        except Exception as e:
-            logger.warning(f"Could not generate URL for {file_path}: {e}")
-            return None
+        return await self.storage.get_url(file_path)
 
     async def _get_project_results_urls(self, project: Project) -> ProjectResultLinks:
         """Convert database results to ProjectResults with proper URLs."""

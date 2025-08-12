@@ -1,7 +1,7 @@
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import (
@@ -121,50 +121,27 @@ class DynamoDBConfig(BaseModel):
     table_prefix: str = "ftw-"
 
 
-class LocalStorageConfig(BaseModel):
-    """Local filesystem storage configuration."""
+class SourceCoopConfig(BaseModel):
+    """Source Coop configuration."""
 
-    backend: Literal["local"] = "local"
-    output_dir: str = "data/results"
-    temp_dir: str = "data/temp"
-    max_file_size_mb: int = 100
-
-
-class _BaseS3Config(BaseModel):
-    """Base S3-compatible storage configuration."""
-
-    bucket_name: str
-    region: str | None = None
-    presigned_url_expiry: int = 3600
-
-
-class S3StorageConfig(_BaseS3Config):
-    """Standard AWS S3 storage configuration."""
-
-    backend: Literal["s3"] = "s3"
-
-
-class SourceCoopStorageConfig(_BaseS3Config):
-    """Source Coop S3-compatible storage configuration."""
-
-    backend: Literal["source_coop"] = "source_coop"
+    bucket_name: str = "ftw"
+    region: str = "us-west-2"
     endpoint_url: str = "https://data.source.coop"
     repository_path: str = "ftw-inference-output"
-
     access_key_id: str | None = None
     secret_access_key: str | None = None
     use_secrets_manager: bool = False
     secret_name: str = "ftw/source-coop/api-credentials"
     secrets_manager_region: str | None = None
-    use_direct_s3: bool = False
-    direct_s3_bucket: str | None = None
-    direct_s3_region: str | None = None
 
 
-StorageConfig = Annotated[
-    LocalStorageConfig | S3StorageConfig | SourceCoopStorageConfig,
-    Field(discriminator="backend"),
-]
+class StorageConfig(BaseModel):
+    """Unified storage configuration."""
+
+    backend: Literal["local", "source_coop"] = "local"
+    output_dir: str = "data/results"
+    max_file_size_mb: int = 100
+    source_coop: SourceCoopConfig = Field(default_factory=SourceCoopConfig)
 
 
 class Settings(BaseSettings):
@@ -189,7 +166,7 @@ class Settings(BaseSettings):
     cloudwatch: CloudWatchConfig = Field(default_factory=CloudWatchConfig)
     dynamodb: DynamoDBConfig = Field(default_factory=DynamoDBConfig)
 
-    storage: StorageConfig = Field(default_factory=LocalStorageConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
 
     models: list[dict[str, Any]] = Field(default_factory=list)
 
