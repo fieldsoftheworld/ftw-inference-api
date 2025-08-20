@@ -167,7 +167,7 @@ httpx = ">=0.24.0"
 pytest-aioboto3 = "*"
 
 [tool.pixi.feature.lint.dependencies]
-pre-commit = ">=3.3.2"
+pre-commit = ">=4"
 ruff = ">=0.7"
 mypy = "*"
 

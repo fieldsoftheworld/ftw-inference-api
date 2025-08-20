@@ -31,10 +31,7 @@ sudo apt-get update
 sudo apt-get upgrade -y
 
 echo "Installing system dependencies..."
-sudo apt-get install -y \
-    sqlite3 \
-    libsqlite3-dev \
-    curl
+sudo apt-get install -y  curl
 
 echo "Installing Pixi..."
 if command -v pixi &> /dev/null; then
