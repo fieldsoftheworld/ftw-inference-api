@@ -106,6 +106,13 @@ class InferenceResultsResponse(BaseModel):
     polygons: str | None = Field(None, description="URL to GeoJSON polygons result")
 
 
+class SceneSelectionResponse(BaseModel):
+    """Response for Sentinel-2 scene selection with HTTP URLs."""
+
+    window_a: str = Field(..., description="HTTP URL for window A scene")
+    window_b: str = Field(..., description="HTTP URL for window B scene")
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
 

@@ -68,6 +68,19 @@ class ExampleWorkflowRequest(BaseModel):
     )
 
 
+class SceneSelectionRequest(BaseModel):
+    """Parameters for Sentinel-2 scene selection."""
+
+    year: int = Field(..., description="Year for scene selection")
+    bbox: list[float] = Field(
+        ..., description="Bounding box [minX, minY, maxX, maxY] in EPSG:4326"
+    )
+    cloud_cover_max: int = Field(
+        20, description="Maximum cloud cover percentage (0-100)"
+    )
+    buffer_days: int = Field(14, description="Buffer days around target date")
+
+
 class CreateProjectRequest(BaseModel):
     """Request to create a new project."""
 

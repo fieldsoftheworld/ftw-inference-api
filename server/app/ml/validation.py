@@ -120,6 +120,39 @@ def validate_processing_params(params: dict[str, Any]) -> None:
         raise ValueError("Patch size must be a multiple of 32.")
 
 
+def validate_year(year: int) -> None:
+    """Validate year is within reasonable range for Sentinel-2 data."""
+    if year < 2015:
+        raise ValueError("Year must be 2015 or later (Sentinel-2 launch year)")
+    if year > 2030:
+        raise ValueError("Year must be 2030 or earlier")
+
+
+def validate_cloud_cover(cloud_cover: int) -> None:
+    """Validate cloud cover percentage is between 0-100."""
+    if cloud_cover < 0 or cloud_cover > 100:
+        raise ValueError("Cloud cover must be between 0 and 100 percent")
+
+
+def validate_buffer_days(buffer_days: int) -> None:
+    """Validate buffer days is reasonable positive integer."""
+    if buffer_days < 0:
+        raise ValueError("Buffer days must be 0 or positive")
+    if buffer_days > 365:
+        raise ValueError("Buffer days must be 365 or less")
+
+
+def prepare_scene_selection_params(params: dict[str, Any]) -> dict[str, Any]:
+    """Prepare and validate scene selection parameters."""
+    validate_bbox(params.get("bbox"), require_bbox=True)
+    year = params.get("year")
+    if year is not None:
+        validate_year(year)
+    validate_cloud_cover(params.get("cloud_cover_max", 20))
+    validate_buffer_days(params.get("buffer_days", 14))
+    return params
+
+
 def prepare_inference_params(
     params: dict[str, Any],
     require_bbox: bool = False,
