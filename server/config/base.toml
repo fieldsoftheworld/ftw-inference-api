@@ -71,6 +71,8 @@ description = "2-Class model trained on the full FTW dataset for field boundary 
 license = "proprietary"
 version = "v1"
 file = "2_Class_FULL_FTW_Pretrained.ckpt"
+requires_window = true
+requires_polygonize = true
 
 [[models]]
 id = "2_Class_CCBY_FTW_Pretrained"
@@ -79,6 +81,8 @@ description = "2-Class model trained on a limited FTW dataset for field boundary
 license = "CC-BY-4.0"
 version = "v1"
 file = "2_Class_CCBY_FTW_Pretrained.ckpt"
+requires_window = true
+requires_polygonize = true
 
 [[models]]
 id = "3_Class_FULL_FTW_Pretrained"
@@ -87,6 +91,8 @@ description = "3-Class model trained on the full FTW dataset for field boundary 
 license = "proprietary"
 version = "v1"
 file = "3_Class_FULL_FTW_Pretrained.ckpt"
+requires_window = true
+requires_polygonize = true
 
 [[models]]
 id = "3_Class_CCBY_FTW_Pretrained"
@@ -95,3 +101,5 @@ description = "3-Class model trained on a limited FTW dataset for field boundary
 license = "CC-BY-4.0"
 version = "v1"
 file = "3_Class_CCBY_FTW_Pretrained.ckpt"
+requires_window = true
+requires_polygonize = true

@@ -9,6 +9,12 @@ class ModelInfo(BaseModel):
     description: str
     license: str
     version: str
+    requires_window: bool = Field(
+        description="Whether this model requires window A and B images"
+    )
+    requires_polygonize: bool = Field(
+        description="Whether this model requires polygonization step"
+    )
 
 
 class TaskInfo(BaseModel):
