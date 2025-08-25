@@ -63,10 +63,7 @@ class InferenceService:
             # Validate parameters
             validated_params = prepare_scene_selection_params(params)
 
-            async with temp_files_context() as temp_files:
-                # Create temporary output file
-                temp_output = temp_files.create_temp_file(suffix=".json")
-
+            async with temp_files_context("scene_selection.json") as (temp_output,):
                 # Build and execute CLI command
                 cmd = build_scene_selection_command(
                     year=validated_params["year"],
