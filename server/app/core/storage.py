@@ -1,7 +1,7 @@
 import contextlib
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import aioboto3
 import aiofiles
@@ -147,7 +147,13 @@ class SourceCoopStorage:
         if self._initialized:
             return
 
-        if self.config.use_secrets_manager:
+        # TEMPORARY: STS workaround takes precedence over other auth methods
+        if self.config.use_sts_workaround:
+            # Credentials will be obtained via STS assume role
+            self._access_key_id = None
+            self._secret_access_key = None
+            logger.info("TEMPORARY: Using STS workaround for Source Coop access")
+        elif self.config.use_secrets_manager:
             logger.info(
                 f"Load SourceCoop creds from Secrets Manager: {self.config.secret_name}"
             )
@@ -184,15 +190,26 @@ class SourceCoopStorage:
             response_checksum_validation="when_required",
         )
 
-        async with self._session.client(
-            "s3",
-            region_name=self._region,
-            endpoint_url=self._endpoint_url,
-            aws_access_key_id=self._access_key_id,
-            aws_secret_access_key=self._secret_access_key,
-            config=source_coop_config,
-        ) as s3:
-            yield s3
+        # TEMPORARY: STS workaround (Remove entire block when Source Coop is fixed)
+        if self.config.use_sts_workaround:
+            async for s3_client in self._get_sts_s3_client(source_coop_config):
+                yield s3_client
+        else:
+            # Build client kwargs
+            client_kwargs: dict[str, Any] = {
+                "service_name": "s3",
+                "region_name": self._region,
+                "endpoint_url": self._endpoint_url,
+                "config": source_coop_config,
+            }
+
+            # Only add credentials if available (not using IAM role)
+            if self._access_key_id and self._secret_access_key:
+                client_kwargs["aws_access_key_id"] = self._access_key_id
+                client_kwargs["aws_secret_access_key"] = self._secret_access_key
+
+            async with self._session.client(**client_kwargs) as s3:
+                yield s3
 
     def _get_storage_key(self, key: str) -> str:
         """Prepend the repository path to the storage key."""
@@ -208,15 +225,63 @@ class SourceCoopStorage:
             return storage_key.removeprefix(f"{self.config.repository_path}/")
         return storage_key
 
+    # ========== START TEMPORARY STS WORKAROUND ==========
+    # Remove this entire section when Source Coop is fixed
+
+    async def _get_sts_s3_client(
+        self, source_coop_config: AioConfig
+    ) -> "AsyncGenerator[S3Client, None]":
+        """TEMPORARY: Get S3 client using STS assume role for cross-account access."""
+        logger.info(f"TEMPORARY: Assuming role {self.config.sts_role_arn}")
+
+        if not self._session:
+            raise RuntimeError("Source Coop session not initialized.")
+
+        async with self._session.client("sts") as sts:
+            response = await sts.assume_role(
+                RoleArn=self.config.sts_role_arn,
+                RoleSessionName="ftw-source-coop-temp-access",
+                ExternalId=self.config.sts_external_id,
+            )
+            creds = response["Credentials"]
+
+            # Create S3 client with temporary credentials (no endpoint_url for S3)
+            async with self._session.client(
+                service_name="s3",
+                region_name=self._region,
+                aws_access_key_id=creds["AccessKeyId"],
+                aws_secret_access_key=creds["SecretAccessKey"],
+                aws_session_token=creds["SessionToken"],
+                config=source_coop_config,
+            ) as s3:
+                yield s3
+
+    def _get_actual_bucket(self) -> str:
+        """TEMPORARY: Get the actual S3 bucket name for operations."""
+        if self.config.use_sts_workaround:
+            return self.config.sts_real_bucket
+        return self.bucket_name
+
+    def _get_actual_storage_key(self, key: str) -> str:
+        """TEMPORARY: Get the actual S3 key including any path adjustments."""
+        storage_key = self._get_storage_key(key)
+        # If using STS workaround, prepend bucket prefix to the path
+        if self.config.use_sts_workaround:
+            storage_key = f"{self.config.sts_bucket_prefix}/{storage_key}"
+        return storage_key
+
+    # ========== END TEMPORARY STS WORKAROUND ==========
+
     async def upload(self, local_path: Path, key: str) -> str:
         """Upload file to Source Coop and return the key."""
-        storage_key = self._get_storage_key(key)
         async with self._get_s3_client() as s3:
             try:
-                await s3.upload_file(str(local_path), self.bucket_name, storage_key)
-                logger.info(
-                    f"Uploaded {local_path} to s3://{self.bucket_name}/{storage_key}"
-                )
+                # TEMP
+                bucket = self._get_actual_bucket()
+                storage_key = self._get_actual_storage_key(key)
+
+                await s3.upload_file(str(local_path), bucket, storage_key)
+                logger.info(f"Uploaded {local_path} to s3://{bucket}/{storage_key}")
                 return key
             except ClientError as e:
                 logger.error(f"Failed to upload {local_path} to Source Coop: {e}")
@@ -224,13 +289,14 @@ class SourceCoopStorage:
 
     async def download(self, key: str, local_path: Path) -> None:
         """Download file from Source Coop to local path."""
-        storage_key = self._get_storage_key(key)
         async with self._get_s3_client() as s3:
             try:
-                await s3.download_file(self.bucket_name, storage_key, str(local_path))
-                logger.info(
-                    f"Downloaded s3://{self.bucket_name}/{storage_key} to {local_path}"
-                )
+                # TEMP
+                bucket = self._get_actual_bucket()
+                storage_key = self._get_actual_storage_key(key)
+
+                await s3.download_file(bucket, storage_key, str(local_path))
+                logger.info(f"Downloaded s3://{bucket}/{storage_key} to {local_path}")
             except ClientError as e:
                 logger.error(f"Failed to download {key} from Source Coop: {e}")
                 raise
@@ -250,28 +316,40 @@ class SourceCoopStorage:
 
     async def delete(self, key: str) -> None:
         """Delete file from Source Coop."""
-        storage_key = self._get_storage_key(key)
         async with self._get_s3_client() as s3:
             try:
-                await s3.delete_object(Bucket=self.bucket_name, Key=storage_key)
-                logger.info(f"Deleted s3://{self.bucket_name}/{storage_key}")
+                # TEMP
+                bucket = self._get_actual_bucket()
+                storage_key = self._get_actual_storage_key(key)
+
+                await s3.delete_object(Bucket=bucket, Key=storage_key)
+                logger.info(f"Deleted s3://{bucket}/{storage_key}")
             except ClientError as e:
                 logger.error(f"Failed to delete {key} from Source Coop: {e}")
                 raise
 
     async def list_files(self, prefix: str) -> list[str]:
         """List files with given prefix in Source Coop."""
-        storage_prefix = self._get_storage_key(prefix)
         async with self._get_s3_client() as s3:
             try:
+                # TEMP
+                bucket = self._get_actual_bucket()
+                storage_prefix = self._get_actual_storage_key(prefix)
+
                 paginator = s3.get_paginator("list_objects_v2")
                 keys: list[str] = []
                 async for result in paginator.paginate(
-                    Bucket=self.bucket_name, Prefix=storage_prefix
+                    Bucket=bucket, Prefix=storage_prefix
                 ):
                     keys.extend(
                         content["Key"] for content in result.get("Contents", [])
                     )
+
+                # TEMPORARY: Strip STS bucket prefix if using workaround
+                if self.config.use_sts_workaround:
+                    prefix_with_slash = f"{self.config.sts_bucket_prefix}/"
+                    keys = [k.removeprefix(prefix_with_slash) for k in keys]
+
                 return [self._strip_repository_path(key) for key in keys]
             except ClientError as e:
                 logger.error(f"Failed to list files with prefix {prefix}: {e}")
@@ -279,10 +357,13 @@ class SourceCoopStorage:
 
     async def file_exists(self, key: str) -> bool:
         """Check if file exists in Source Coop."""
-        storage_key = self._get_storage_key(key)
         async with self._get_s3_client() as s3:
             try:
-                await s3.head_object(Bucket=self.bucket_name, Key=storage_key)
+                # TEMP
+                bucket = self._get_actual_bucket()
+                storage_key = self._get_actual_storage_key(key)
+
+                await s3.head_object(Bucket=bucket, Key=storage_key)
                 return True
             except ClientError as e:
                 if e.response["Error"]["Code"] == "404":
