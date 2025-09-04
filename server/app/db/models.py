@@ -7,6 +7,7 @@ import pendulum
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.models import Model
 
+from ..utils.name_generator import generate_unique_project_id
 from app.core.config import get_settings
 from app.core.types import ProjectStatus
 
@@ -19,7 +20,7 @@ class Project(Model):
         region = settings.dynamodb.aws_region
         host = settings.dynamodb.dynamodb_endpoint  # For local development
 
-    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
+    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: generate_unique_project_id())
     title = UnicodeAttribute()
     status = UnicodeAttribute(default=ProjectStatus.CREATED.value)
     progress = UnicodeAttribute(null=True)  # Store as string
