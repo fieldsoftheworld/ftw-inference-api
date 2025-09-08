@@ -44,6 +44,20 @@ class TestStorageFactory:
         storage = get_storage(settings)
         assert isinstance(storage, SourceCoopStorage)
 
+    def test_get_storage_source_coop_with_iam_role(self):
+        """Test Source Coop storage with STS workaround authentication."""
+        settings = Settings(_env_file=None, _env_ignore_empty=True)
+        settings.storage = StorageConfig(
+            backend="source_coop",
+            source_coop=SourceCoopConfig(
+                bucket_name="test-bucket",
+                use_sts_workaround=True,
+            ),
+        )
+        storage = get_storage(settings)
+        assert isinstance(storage, SourceCoopStorage)
+        assert storage.config.use_sts_workaround is True
+
 
 class TestLocalStorage:
     """Test local storage implementation."""

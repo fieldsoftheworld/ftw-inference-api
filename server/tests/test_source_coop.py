@@ -95,6 +95,85 @@ class TestSourceCoopStorage:
 
         assert not storage._initialized
 
+    def test_init_with_iam_role(self):
+        """Test storage initialization with STS workaround enabled."""
+        source_coop = SourceCoopConfig(
+            bucket_name="test-bucket",
+            use_sts_workaround=True,
+        )
+        storage_config = StorageConfig(backend="source_coop", source_coop=source_coop)
+        storage = SourceCoopStorage(storage_config)
+        assert storage.config.use_sts_workaround is True
+        assert storage.config.bucket_name == "test-bucket"
+
+    async def test_lazy_init_with_iam_role(self):
+        """Test that STS workaround skips credential loading."""
+        source_coop = SourceCoopConfig(
+            bucket_name="test-bucket",
+            use_sts_workaround=True,
+        )
+        storage_config = StorageConfig(backend="source_coop", source_coop=source_coop)
+        storage = SourceCoopStorage(storage_config)
+
+        await storage._lazy_init()
+
+        assert storage._initialized is True
+        assert storage._access_key_id is None
+        assert storage._secret_access_key is None
+
+    @patch("app.core.storage.aioboto3.Session")
+    async def test_s3_client_without_credentials(self, mock_session):
+        """Test S3 client creation with IAM role (temporary cross-account fix)."""
+        # Mock STS client for assume role
+        mock_sts = AsyncMock()
+        mock_sts.assume_role = AsyncMock(
+            return_value={
+                "Credentials": {
+                    "AccessKeyId": "ASIA_TEMP_KEY",
+                    "SecretAccessKey": "temp_secret",
+                    "SessionToken": "temp_token",
+                    "Expiration": "2025-01-01T00:00:00Z",
+                }
+            }
+        )
+        mock_sts_context = AsyncMock()
+        mock_sts_context.__aenter__ = AsyncMock(return_value=mock_sts)
+        mock_sts_context.__aexit__ = AsyncMock(return_value=None)
+
+        # Mock S3 client
+        mock_s3 = AsyncMock()
+        mock_s3_context = AsyncMock()
+        mock_s3_context.__aenter__ = AsyncMock(return_value=mock_s3)
+        mock_s3_context.__aexit__ = AsyncMock(return_value=None)
+
+        # Configure session to return STS first, then S3
+        mock_session.return_value.client.side_effect = [
+            mock_sts_context,
+            mock_s3_context,
+        ]
+
+        source_coop = SourceCoopConfig(
+            bucket_name="test-bucket",
+            use_sts_workaround=True,
+        )
+        storage_config = StorageConfig(backend="source_coop", source_coop=source_coop)
+        storage = SourceCoopStorage(storage_config)
+
+        async with storage._get_s3_client():
+            # Verify assume role was called with correct parameters
+            mock_sts.assume_role.assert_called_once_with(
+                RoleArn="arn:aws:iam::417712557820:role/ftw-cross-account-access",
+                RoleSessionName="ftw-source-coop-temp-access",
+                ExternalId="tge",
+            )
+
+            # Verify S3 client was created with temporary credentials
+            calls = mock_session.return_value.client.call_args_list
+            s3_call = calls[1]
+            assert s3_call.kwargs["aws_access_key_id"] == "ASIA_TEMP_KEY"
+            assert s3_call.kwargs["aws_secret_access_key"] == "temp_secret"
+            assert s3_call.kwargs["aws_session_token"] == "temp_token"
+
 
 class TestSecretsManager:
     """Test AWS Secrets Manager integration."""
