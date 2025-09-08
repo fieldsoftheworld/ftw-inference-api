@@ -49,7 +49,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         client_ip.set(request.client.host if request.client else "")
         endpoint.set(f"{request.method} {request.url.path}")
 
-        logger.info(
+        # Use debug level for healthcheck requests to avoid log pollution
+        log_level = logger.debug if request.url.path == "/v1/health" else logger.info
+        log_level(
             "Request started",
             extra={
                 "method": request.method,
@@ -63,7 +65,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
             duration_ms = round((time.time() - start_time) * 1000, 2)
 
-            logger.info(
+            # Use debug level for healthcheck requests to avoid log pollution
+            log_level = (
+                logger.debug if request.url.path == "/v1/health" else logger.info
+            )
+            log_level(
                 "Request completed",
                 extra={
                     "method": request.method,
