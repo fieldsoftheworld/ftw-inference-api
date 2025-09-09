@@ -135,7 +135,7 @@ class SourceCoopConfig(BaseModel):
     secrets_manager_region: str | None = None
 
     # TEMPORARY: STS workaround (Remove when Source Coop is fixed)
-    use_sts_workaround: bool = False  # flag to enable/disable STS workaround
+    use_sts_workaround: bool = True  # flag to enable/disable STS workaround
     sts_role_arn: str = "arn:aws:iam::417712557820:role/ftw-cross-account-access"
     sts_external_id: str = "tge"
     sts_real_bucket: str = "us-west-2.opendata.source.coop"
