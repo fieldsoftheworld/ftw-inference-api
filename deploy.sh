@@ -95,6 +95,7 @@ cat > /tmp/ftw-production.env << EOF
 PROCESSING__GPU=0
 SECURITY__AUTH_DISABLED=true
 LOGGING__LEVEL=INFO
+STORAGE__SOURCE_COOP__USE_STS_WORKAROUND=true
 EOF
 
 # Move environment file to proper location
@@ -114,7 +115,7 @@ HOME_DIR="$(eval echo ~$USER)"
 
 # Conditionally build the ExecStart command based on the GPU configuration.
 # We check the final destination of the production.env file.
-BASE_EXEC_START="${HOME_DIR}/.pixi/bin/pixi run --environment production python run.py --host 0.0.0.0 --port 8000 --no-access-log"
+BASE_EXEC_START="${HOME_DIR}/.pixi/bin/pixi run --environment production python run.py --host 0.0.0.0 --port 8000"
 EXEC_START_CMD=$BASE_EXEC_START
 
 if grep -q "PROCESSING__GPU=null" /etc/ftw-inference-api/production.env; then
