@@ -9,8 +9,7 @@ from pynamodb.models import Model
 
 from app.core.config import get_settings
 from app.core.types import ProjectStatus
-
-from ..utils.name_generator import generate_unique_project_id
+from app.utils.name_generator import generate_unique_project_id
 
 settings = get_settings()
 
