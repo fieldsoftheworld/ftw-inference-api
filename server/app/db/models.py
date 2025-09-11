@@ -9,7 +9,7 @@ from pynamodb.models import Model
 
 from app.core.config import get_settings
 from app.core.types import ProjectStatus
-from app.utils.name_generator import generate_project_id 
+from app.utils.name_generator import generate_project_id
 
 settings = get_settings()
 
@@ -20,9 +20,7 @@ class Project(Model):
         region = settings.dynamodb.aws_region
         host = settings.dynamodb.dynamodb_endpoint  # For local development
 
-    id = UnicodeAttribute(
-    hash_key=True, default_for_new=lambda: generate_project_id()
-    )
+    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: generate_project_id())
     title = UnicodeAttribute()
     status = UnicodeAttribute(default=ProjectStatus.CREATED.value)
     progress = UnicodeAttribute(null=True)  # Store as string
