@@ -19,6 +19,7 @@ from app.schemas import (
     ProjectStatusResponse,
 )
 from app.services.task_service import TaskService
+from app.utils.name_generator import generate_project_id
 
 logger = get_logger(__name__)
 
@@ -131,23 +132,22 @@ class ProjectService:
     def project_exists(self, project_id: str) -> bool:
         """Check if a project exists in the database."""
         try:
-            self._get_project_or_404(project_id)
+            Project.get(project_id)
             return True
-        except HTTPException:
+        except DoesNotExist:
             return False
 
     def _generate_unique_project_id(self, max_attempts: int = 20) -> str:
         """Generate unique project ID with collision checking."""
-        from app.utils.name_generator import generate_project_id
-
         for _ in range(max_attempts):
             project_id = generate_project_id()
             if not self.project_exists(project_id):
                 return project_id
 
-        # Will request strict collision avoidance - raise error instead of fallback
-        raise RuntimeError(
-            f"Unable to generate unique project ID after {max_attempts} attempts"
+        # Raise HTTP error instead of Runtime error for better API response
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to generate unique project ID. Please try again.",
         )
 
     def get_project_status(self, project_id: str) -> dict[str, Any]:
