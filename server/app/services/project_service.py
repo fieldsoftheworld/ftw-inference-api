@@ -19,6 +19,7 @@ from app.schemas import (
     ProjectStatusResponse,
 )
 from app.services.task_service import TaskService
+from app.utils.name_generator import generate_project_id
 
 logger = get_logger(__name__)
 
@@ -97,7 +98,8 @@ class ProjectService:
         self, project_data: CreateProjectRequest
     ) -> ProjectResponse:
         """Create a new project and return its response model."""
-        new_project = Project(title=project_data.title)
+        unique_id = self._generate_unique_project_id()
+        new_project = Project(id=unique_id, title=project_data.title)
         new_project.save()
         return await self._map_project_to_response(new_project)
 
@@ -126,6 +128,27 @@ class ProjectService:
 
         await self._cleanup_project_files(project_id)
         project.delete()
+
+    def project_exists(self, project_id: str) -> bool:
+        """Check if a project exists in the database."""
+        try:
+            Project.get(project_id)
+            return True
+        except DoesNotExist:
+            return False
+
+    def _generate_unique_project_id(self, max_attempts: int = 20) -> str:
+        """Generate unique project ID with collision checking."""
+        for _ in range(max_attempts):
+            project_id = generate_project_id()
+            if not self.project_exists(project_id):
+                return project_id
+
+        # Raise HTTP error instead of Runtime error for better API response
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to generate unique project ID. Please try again.",
+        )
 
     def get_project_status(self, project_id: str) -> dict[str, Any]:
         """Get basic project status information."""
