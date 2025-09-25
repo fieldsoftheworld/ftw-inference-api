@@ -1,6 +1,7 @@
 """ML parameter validation functions."""
 
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -122,10 +123,11 @@ def validate_processing_params(params: dict[str, Any]) -> None:
 
 def validate_year(year: int) -> None:
     """Validate year is within reasonable range for Sentinel-2 data."""
+    current_year = datetime.now().year
     if year < 2015:
         raise ValueError("Year must be 2015 or later (Sentinel-2 launch year)")
-    if year > 2030:
-        raise ValueError("Year must be 2030 or earlier")
+    if year > current_year:
+        raise ValueError(f"Year must be {current_year} or earlier")
 
 
 def validate_cloud_cover(cloud_cover: int) -> None:

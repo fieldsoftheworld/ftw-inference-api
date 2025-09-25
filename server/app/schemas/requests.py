@@ -71,14 +71,35 @@ class ExampleWorkflowRequest(BaseModel):
 class SceneSelectionRequest(BaseModel):
     """Parameters for Sentinel-2 scene selection."""
 
-    year: int = Field(..., description="Year for scene selection")
+    year: int = Field(
+        ..., description="Year for scene selection (2015 to current year)"
+    )
     bbox: list[float] = Field(
         ..., description="Bounding box [minX, minY, maxX, maxY] in EPSG:4326"
     )
     cloud_cover_max: int = Field(
-        20, description="Maximum cloud cover percentage (0-100)"
+        default=20,
+        ge=0,
+        le=100,
+        description="Maximum cloud cover percentage (0-100). Default: 20",
     )
-    buffer_days: int = Field(14, description="Buffer days around target date")
+    buffer_days: int = Field(
+        default=14,
+        ge=0,
+        le=365,
+        description="Buffer days around target date. Default: 14",
+    )
+    stac_host: Literal["mspc", "earthsearch"] = Field(
+        default="earthsearch",
+        description=(
+            "STAC API host to use. 'mspc' for Microsoft Planetary Computer, "
+            "'earthsearch' for Earth Search. Default: 'mspc'"
+        ),
+    )
+    s2_collection: str = Field(
+        default="c1",
+        description="Sentinel-2 collection version. Default: 'c1'",
+    )
 
 
 class CreateProjectRequest(BaseModel):

@@ -71,6 +71,8 @@ class InferenceService:
                     out=str(temp_output),
                     cloud_cover_max=validated_params.get("cloud_cover_max", 20),
                     buffer_days=validated_params.get("buffer_days", 14),
+                    stac_host=validated_params.get("stac_host", "earthsearch"),
+                    s2_collection=validated_params.get("s2_collection", "c1"),
                 )
 
                 result = await run_async(cmd)
