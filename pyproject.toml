@@ -114,7 +114,7 @@ output = "coverage.xml"
 # Pixi configuration
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+platforms = ["linux-64", "osx-arm64", "win-64"]
 
 [tool.pixi.dependencies]
 # Python runtime
@@ -151,7 +151,7 @@ watchtower = ">=3.4.0"
 pixi-pycharm = ">=0.0.8,<0.0.10"
 
 [tool.pixi.pypi-dependencies]
-ftw-tools = ">=1.3.0"
+ftw-tools = ">=2.0.0b1"
 python-jose = { version = ">=3.3.0", extras = ["cryptography"] }
 # CRITICAL: Must use this exact version to avoid filesystem registration error
 # See: https://github.com/apache/arrow/issues/44696
