@@ -108,6 +108,7 @@ The API provides the following versioned endpoints under `/v1/`:
 
 - `GET /`: Root endpoint that returns basic API information
 - `PUT /v1/example`: Compute field boundaries for a small area quickly and return as GeoJSON
+- `POST /v1/scene-selection`: Find optimal Sentinel-2 scenes for a specified area and time period
 - `POST /v1/projects`: Create a new project
 - `GET /v1/projects`: List all projects
 - `GET /v1/projects/{project_id}`: Get details of a specific project

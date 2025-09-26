@@ -74,3 +74,37 @@ def build_polygonize_command(
         cmd.append("--close_interiors")
 
     return cmd
+
+
+def build_scene_selection_command(
+    year: int,
+    bbox: list[float],
+    out: str,
+    cloud_cover_max: int = 20,
+    buffer_days: int = 14,
+    stac_host: str = "mspc",
+    s2_collection: str = "c1",
+) -> list[str]:
+    """Build ftw scene-selection command for Sentinel-2 scene selection."""
+    bbox_str = ",".join(map(str, bbox))
+    cmd = [
+        "ftw",
+        "inference",
+        "scene-selection",
+        "--year",
+        str(year),
+        "--bbox",
+        bbox_str,
+        "--cloud_cover_max",
+        str(cloud_cover_max),
+        "--buffer_days",
+        str(buffer_days),
+        "--stac_host",
+        stac_host,
+        "--s2_collection",
+        s2_collection,
+        "--out",
+        out,
+    ]
+
+    return cmd

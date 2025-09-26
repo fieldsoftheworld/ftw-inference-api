@@ -20,6 +20,8 @@ from app.ml import (
     prepare_inference_params,
     run_polygonize,
 )
+from app.ml.commands import build_scene_selection_command
+from app.ml.validation import prepare_scene_selection_params
 from app.services.project_service import ProjectService
 from app.services.task_service import TaskService
 
@@ -54,6 +56,53 @@ class InferenceService:
         )
 
     # --- Public API: Workflow Submission ---
+
+    async def run_scene_selection(self, params: dict[str, Any]) -> dict[str, str]:
+        """Run scene selection to find optimal Sentinel-2 scenes.
+
+        Returns STAC item URLs that can be directly used with ftw download command."""
+        try:
+            # Validate parameters
+            validated_params = prepare_scene_selection_params(params)
+
+            async with temp_files_context("scene_selection.json") as (temp_output,):
+                # Build and execute CLI command
+                cmd = build_scene_selection_command(
+                    year=validated_params["year"],
+                    bbox=validated_params["bbox"],
+                    out=str(temp_output),
+                    cloud_cover_max=validated_params.get("cloud_cover_max", 20),
+                    buffer_days=validated_params.get("buffer_days", 14),
+                    stac_host=validated_params.get("stac_host", "earthsearch"),
+                    s2_collection=validated_params.get("s2_collection", "c1"),
+                )
+
+                result = await run_async(cmd)
+                if result.returncode != 0:
+                    logger.error(f"Scene selection failed: {result.stderr}")
+                    raise RuntimeError("Scene selection command failed")
+
+                # Read and parse JSON output
+                async with aiofiles.open(temp_output) as f:
+                    content = await f.read()
+                    scene_data = json.loads(content)
+
+                # Return STAC item URLs directly - ftw handles these natively
+                return {
+                    "window_a": scene_data.get("window_a", ""),
+                    "window_b": scene_data.get("window_b", ""),
+                }
+
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+            ) from e
+        except Exception as e:
+            logger.error(f"Scene selection error: {e!s}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An internal error occurred during scene selection",
+            ) from e
 
     async def run_example_workflow(
         self,

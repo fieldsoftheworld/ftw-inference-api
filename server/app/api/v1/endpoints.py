@@ -8,6 +8,7 @@ from app.schemas.requests import (
     ExampleWorkflowRequest,
     InferenceRequest,
     PolygonizationRequest,
+    SceneSelectionRequest,
 )
 from app.schemas.responses import (
     HealthResponse,
@@ -15,6 +16,7 @@ from app.schemas.responses import (
     ProjectsResponse,
     ProjectStatusResponse,
     RootResponse,
+    SceneSelectionResponse,
     TaskDetailsResponse,
     TaskSubmissionResponse,
 )
@@ -228,6 +230,21 @@ async def get_task_status(
     """Get detailed status and metadata for a specific task."""
     task_details = await task_service.get_task_details(project_id, task_id)
     return TaskDetailsResponse(**task_details)
+
+
+@router.post(
+    "/scene-selection",
+    response_model=SceneSelectionResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def scene_selection(
+    params: SceneSelectionRequest,
+    inference_service: InferenceServiceDep,
+    auth: AuthDep,
+) -> SceneSelectionResponse:
+    """Find optimal Sentinel-2 scenes for specified area and time."""
+    result = await inference_service.run_scene_selection(params.model_dump())
+    return SceneSelectionResponse(**result)
 
 
 @router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
