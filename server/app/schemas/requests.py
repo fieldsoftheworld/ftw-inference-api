@@ -93,7 +93,7 @@ class SceneSelectionRequest(BaseModel):
         default="earthsearch",
         description=(
             "STAC API host to use. 'mspc' for Microsoft Planetary Computer, "
-            "'earthsearch' for Earth Search. Default: 'mspc'"
+            "'earthsearch' for Earth Search. Default: 'earthsearch'"
         ),
     )
     s2_collection: str = Field(
