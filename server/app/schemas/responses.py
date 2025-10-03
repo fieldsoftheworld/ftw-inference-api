@@ -19,7 +19,9 @@ class RootResponse(BaseModel):
     title: str
     description: str
     min_area_km2: float
-    max_area_km2: float
+    example_max_area_km2: float
+    project_max_area_km2: float
+    example_endpoint_enabled: bool
     models: list[ModelInfo]
 
 

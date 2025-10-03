@@ -167,3 +167,50 @@ def prepare_inference_params(
     validate_model(params)
     validate_processing_params(params)
     return params
+
+
+def validate_bbox_area(
+    bbox: list[float],
+    is_project: bool,
+    settings: Any,
+) -> float:
+    """Validate bounding box area against limits.
+
+    Args:
+        bbox: [minX, minY, maxX, maxY]
+        is_project: True for project mode, False for example mode
+        settings: Application settings
+
+    Returns:
+        Area in square kilometers
+
+    Raises:
+        ValueError: If area is outside allowed limits
+    """
+    from app.core.geo import calculate_area_km2
+
+    area_km2 = calculate_area_km2(bbox)
+    min_area = settings.processing.min_area_km2
+    max_area = settings.processing.get_max_area_for_mode(is_project)
+
+    mode_name = "project/batch" if is_project else "example"
+
+    if area_km2 < min_area:
+        raise ValueError(
+            f"Area too small: {area_km2:.2f} sq km. Minimum area is {min_area} sq km."
+        )
+
+    if area_km2 > max_area:
+        suggestion = ""
+        if not is_project:
+            suggestion = (
+                f" Consider using project-based workflow which supports "
+                f"up to {settings.processing.project_max_area_km2} sq km."
+            )
+
+        raise ValueError(
+            f"Area too large for {mode_name} processing: {area_km2:.2f} sq km. "
+            f"Maximum area for {mode_name} mode is {max_area} sq km.{suggestion}"
+        )
+
+    return area_km2
