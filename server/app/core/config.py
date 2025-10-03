@@ -77,6 +77,7 @@ class ProcessingConfig(BaseModel):
     example_max_area_km2: float = 500.0  # Deprecated example endpoint
     project_max_area_km2: float = 3000.0  # Project/batch processing
     small_area_threshold_km2: float = 300.0
+
     @property
     def max_area_km2(self) -> float:
         return self.example_max_area_km2

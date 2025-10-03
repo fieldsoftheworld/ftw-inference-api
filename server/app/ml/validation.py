@@ -167,7 +167,7 @@ def validate_bbox_area(
 
     if area_km2 > max_area:
         suggestion = ""
-        if not is_project and area_km2 <= settings.processing.project_max_area_km2:
+        if not is_project:
             suggestion = (
                 f" Consider using project-based workflow which supports "
                 f"up to {settings.processing.project_max_area_km2} sq km."
