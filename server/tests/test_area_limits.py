@@ -9,7 +9,7 @@ def test_validate_bbox_area_too_small():
     """Should reject areas smaller than 0.1 km²."""
     # Tiny box near the equator (~0.012 km²)
     bbox = [0.0, 0.0, 0.001, 0.001]
-    with pytest.raises(ValueError, match="Minimum area is 0.1"):
+    with pytest.raises(ValueError, match=r"Minimum area is 0.1"):
         validate_bbox_area(bbox, is_project=True, settings=Settings())
 
 
@@ -25,7 +25,7 @@ def test_validate_bbox_area_example_too_large():
     """Should reject example areas over 500 km²."""
     # ~8,600 km² near 45° lat (1.0 x 1.0 degrees)
     bbox = [10.0, 45.0, 11.0, 46.0]
-    with pytest.raises(ValueError, match="Area too large.*example"):
+    with pytest.raises(ValueError, match=r"Area too large.*example"):
         validate_bbox_area(bbox, is_project=False, settings=Settings())
 
 
@@ -41,5 +41,5 @@ def test_validate_bbox_area_project_too_large():
     """Should reject project areas over 3000 km²."""
     # ~35,000 km² near 45° lat (2.0 x 2.0 degrees)
     bbox = [10.0, 45.0, 12.0, 47.0]
-    with pytest.raises(ValueError, match="Area too large.*project"):
+    with pytest.raises(ValueError, match=r"Area too large.*project"):
         validate_bbox_area(bbox, is_project=True, settings=Settings())
