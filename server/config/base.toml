@@ -21,7 +21,7 @@ algorithm = "HS256"
 access_token_expire_minutes = 30
 
 [processing]
-min_area_km2 = 100.0
+min_area_km2 = 0.1
 max_area_km2 = 500.0
 max_concurrent_examples = 10
 example_timeout = 60
