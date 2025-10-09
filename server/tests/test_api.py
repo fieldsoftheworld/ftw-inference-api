@@ -137,7 +137,7 @@ def test_upload_image_and_inference(client, tmp_path):
     assert response.status_code == 201
     inference_params = {
         "bbox": [0, 1, 2, 3],
-        "model": "2_Class_FULL_FTW_Pretrained",
+        "model": "2_Class_FULL_v1",
         "images": None,
         "resize_factor": 2,
         "patch_size": 512,
@@ -156,7 +156,7 @@ def test_inference_without_images(client):
 
     inference_params = {
         "bbox": None,
-        "model": "2_Class_FULL_FTW_Pretrained",
+        "model": "2_Class_FULL_v1",
         "images": ["https://example.com/image1.tif", "https://example.com/image2.tif"],
         "resize_factor": 2,
         "patch_size": 1024,
@@ -186,7 +186,7 @@ def test_example_endpoint(client):
     """Test the example endpoint for small area computation."""
     request_data = {
         "inference": {
-            "model": "2_Class_FULL_FTW_Pretrained",
+            "model": "2_Class_FULL_v1",
             "images": [
                 "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210617T100559_R022_T33UUP_20210624T063729",
                 "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20210925T101019_R022_T33UUP_20210926T121923",
@@ -209,7 +209,7 @@ def test_example_endpoint_area_too_large(client):
     """Test the example endpoint with an area that's too large."""
     request_data = {
         "inference": {
-            "model": "2_Class_FULL_FTW_Pretrained",
+            "model": "2_Class_FULL_v1",
             "bbox": [0.0, 0.0, 1.0, 1.0],
         },
         "polygons": {},
@@ -224,7 +224,7 @@ def test_example_endpoint_invalid_bbox(client):
     """Test the example endpoint with invalid bbox values (outside EPSG:4326 bounds)."""
     request_data = {
         "inference": {
-            "model": "2_Class_FULL_FTW_Pretrained",
+            "model": "2_Class_FULL_v1",
             "bbox": [-190.0, 0.0, -185.0, 1.0],
         },
         "polygons": {"simplify": 10, "min_size": 200, "close_interiors": False},
@@ -236,7 +236,7 @@ def test_example_endpoint_invalid_bbox(client):
 
     request_data = {
         "inference": {
-            "model": "2_Class_FULL_FTW_Pretrained",
+            "model": "2_Class_FULL_v1",
             "bbox": [0.0, -95.0, 1.0, -92.0],
         },
         "polygons": {},
@@ -248,7 +248,7 @@ def test_example_endpoint_invalid_bbox(client):
 
     request_data = {
         "inference": {
-            "model": "2_Class_FULL_FTW_Pretrained",
+            "model": "2_Class_FULL_v1",
             "bbox": [10.0, 10.0, 5.0, 5.0],
         },
         "polygons": {},
@@ -288,7 +288,7 @@ def test_polygonize_endpoint(client, tmp_path):
 
     inference_params = {
         "bbox": [0, 1, 2, 3],
-        "model": "2_Class_FULL_FTW_Pretrained",
+        "model": "2_Class_FULL_v1",
         "images": None,
         "resize_factor": 2,
         "patch_size": 512,
@@ -299,7 +299,7 @@ def test_polygonize_endpoint(client, tmp_path):
 
     polygonize_params = {
         "bbox": [0, 1, 2, 3],
-        "model": "2_Class_FULL_FTW_Pretrained",
+        "model": "2_Class_FULL_v1",
         "images": None,
         "resize_factor": 2,
         "patch_size": 512,

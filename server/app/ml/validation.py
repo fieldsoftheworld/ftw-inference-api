@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from app.core.config import get_settings
+from ftw_tools.models.model_registry import MODEL_REGISTRY
+
 from app.core.geo import calculate_area_km2
 
 
@@ -68,20 +69,17 @@ def validate_image_urls(urls: Any, require_image_urls: bool = False) -> None:
 
 def validate_model(params: dict[str, Any]) -> None:
     """Validate model configuration and file existence."""
-    settings = get_settings()
     model_id = params.get("model")
 
-    model_config = next(
-        (model for model in settings.models if model.get("id") == model_id),
-        None,
-    )
-    if not model_config:
+    # Check if model exists in registry
+    model_spec = MODEL_REGISTRY.get(model_id)
+    if not model_spec:
         raise ValueError(f"Model with ID '{model_id}' not found")
 
-    model_file = model_config.get("file")
-    if not model_file:
-        raise ValueError(f"Model '{model_id}' has no file specified")
+    # Extract filename from URL (last part after /)
+    model_file = model_spec.url.split("/")[-1]
 
+    # Check if local model file exists
     model_path = Path(__file__).parent.parent.parent / "data" / "models" / model_file
     if not model_path.exists():
         raise ValueError(f"Model file not found at '{model_path}'")
@@ -89,19 +87,15 @@ def validate_model(params: dict[str, Any]) -> None:
 
 def resolve_model_path(model_id: str) -> str:
     """Resolve model ID to absolute file path for ML execution."""
-    settings = get_settings()
-
-    model_config = next(
-        (model for model in settings.models if model.get("id") == model_id),
-        None,
-    )
-    if not model_config:
+    # Get model from registry
+    model_spec = MODEL_REGISTRY.get(model_id)
+    if not model_spec:
         raise ValueError(f"Model with ID '{model_id}' not found")
 
-    model_file = model_config.get("file")
-    if not model_file:
-        raise ValueError(f"Model '{model_id}' has no file specified")
+    # Extract filename from URL
+    model_file = model_spec.url.split("/")[-1]
 
+    # Build local path
     model_path = Path(__file__).parent.parent.parent / "data" / "models" / model_file
     return str(model_path.absolute())
 

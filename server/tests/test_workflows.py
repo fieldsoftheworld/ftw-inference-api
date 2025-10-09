@@ -19,7 +19,7 @@ async def test_full_inference_success_workflow(client: TestClient, dynamodb_tabl
     project_id = create_response.json()["id"]
 
     inference_params = {
-        "model": "2_Class_FULL_FTW_Pretrained",
+        "model": "2_Class_FULL_v1",
         "images": ["https://example.com/a.tif", "https://example.com/b.tif"],
     }
     submit_response = client.put(
@@ -71,7 +71,7 @@ async def test_task_failure_reporting(client: TestClient, mock_queue, dynamodb_t
     submit_response = client.put(
         f"/v1/projects/{project_id}/inference",
         json={
-            "model": "2_Class_FULL_FTW_Pretrained",
+            "model": "2_Class_FULL_v1",
             "images": ["https://a.com/1.tif", "https://b.com/2.tif"],
         },
     )
@@ -119,4 +119,4 @@ async def test_inference_with_invalid_model(client: TestClient):
     error_details = submit_response.json()
     assert "detail" in error_details
     error_str = str(error_details["detail"])
-    assert "Input should be" in error_str and "Pretrained" in error_str
+    assert "Input should be" in error_str

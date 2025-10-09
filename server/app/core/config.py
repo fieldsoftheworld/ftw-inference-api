@@ -90,7 +90,7 @@ class ProcessingConfig(BaseModel):
     gpu: int | None = None
 
     def get_max_area_for_mode(self, is_project: bool) -> float:
-        """Get maximum area limit based on processing mode."""
+        """Get maximum area limit based on processing mode"""
         return self.project_max_area_km2 if is_project else self.example_max_area_km2
 
 
