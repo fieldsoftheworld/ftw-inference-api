@@ -151,7 +151,7 @@ watchtower = ">=3.4.0"
 pixi-pycharm = ">=0.0.8,<0.0.10"
 
 [tool.pixi.pypi-dependencies]
-ftw-tools = ">=2.0.0b2"
+ftw-tools = { version = ">=2.0.0b2", extras = ["all"] }
 python-jose = { version = ">=3.3.0", extras = ["cryptography"] }
 # CRITICAL: Must use this exact version to avoid filesystem registration error
 # See: https://github.com/apache/arrow/issues/44696
