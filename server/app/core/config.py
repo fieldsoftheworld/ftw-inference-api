@@ -72,11 +72,26 @@ class SecurityConfig(BaseModel):
 class ProcessingConfig(BaseModel):
     """ML processing configuration."""
 
-    min_area_km2: float = 100.0
-    max_area_km2: float = 500.0
+    # Area limits for different processing modes
+    min_area_km2: float = 0.1
+    example_max_area_km2: float = 500.0  # Deprecated example endpoint
+    project_max_area_km2: float = 3000.0  # Project/batch processing
+    small_area_threshold_km2: float = 300.0
+
+    @property
+    def max_area_km2(self) -> float:
+        return self.example_max_area_km2
+
+    # Example endpoint deprecation
+    example_enabled: bool = False
+
     max_concurrent_examples: int = 10
     example_timeout: int = 60
     gpu: int | None = None
+
+    def get_max_area_for_mode(self, is_project: bool) -> float:
+        """Get maximum area limit based on processing mode."""
+        return self.project_max_area_km2 if is_project else self.example_max_area_km2
 
 
 class LoggingConfig(BaseModel):

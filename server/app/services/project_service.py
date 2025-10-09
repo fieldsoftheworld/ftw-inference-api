@@ -435,14 +435,17 @@ class ProjectService:
         }
 
     def get_api_configuration(self) -> dict[str, Any]:
-        """Get API configuration for root endpoint."""
+        """Get API configuration information."""
         settings = get_settings()
+
         return {
             "api_version": settings.api.version,
             "title": settings.api.title,
             "description": settings.api.description,
             "min_area_km2": settings.processing.min_area_km2,
-            "max_area_km2": settings.processing.max_area_km2,
+            "example_max_area_km2": settings.processing.example_max_area_km2,
+            "project_max_area_km2": settings.processing.project_max_area_km2,
+            "example_endpoint_enabled": settings.processing.example_enabled,
             "models": settings.models,
         }
 
