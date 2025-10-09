@@ -139,20 +139,7 @@ def validate_bbox_area(
     is_project: bool,
     settings: Any,
 ) -> float:
-    """Validate bounding box area against limits.
-
-    Args:
-        bbox: [minX, minY, maxX, maxY]
-        is_project: True for project mode, False for example mode
-        settings: Application settings
-
-    Returns:
-        Area in square kilometers
-
-    Raises:
-        ValueError: If area is outside allowed limits
-    """
-    from app.core.geo import calculate_area_km2
+    """Validate bounding box area against limits."""
 
     area_km2 = calculate_area_km2(bbox)
     min_area = settings.processing.min_area_km2
