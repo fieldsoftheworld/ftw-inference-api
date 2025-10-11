@@ -189,15 +189,10 @@ lint = { features = ["lint"], solve-group = "default" }
 
 [tool.pixi.tasks]
 # Development tasks
-start = { cmd = "python run.py --debug", cwd = "server", depends-on = ["postinstall", "download-model"] }
+start = { cmd = "python run.py --debug", cwd = "server", depends-on = ["postinstall"] }
 postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-check -e ."
 
 # Setup tasks
-download-model = { cmd = """
-mkdir -p server/data/models && \
-curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt \
-https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
-""", outputs = ["server/data/models/2_Class_FULL_FTW_Pretrained.ckpt"] }
 dynamodb-local = { cmd = "docker run -p 8001:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb -inMemory" }
 
 [dependency-groups]
@@ -211,7 +206,7 @@ pytest -v \
   --cov=app \
   --cov-report=xml \
   --cov-report=term-missing
-""", cwd = "server", depends-on = ["postinstall", "download-model"] }
+""", cwd = "server", depends-on = ["postinstall"] }
 
 [tool.pixi.feature.lint.tasks]
 lint = { cmd = "pre-commit run --all-files", depends-on = ["postinstall"] }

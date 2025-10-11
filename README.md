@@ -36,10 +36,11 @@ This script will:
 - Install Pixi package manager
 - Clone the repository and checkout the specified branch
 - Install dependencies using Pixi production environment
-- Download all pre-trained model checkpoints (~800MB total)
 - Enable GPU support in configuration
 - Configure a systemd service for automatic startup
 - Set up log rotation
+
+**Note:** Model weights (~1.5GB total across 8 models) are automatically downloaded on first use and cached at `~/.cache/torch/hub/checkpoints/`. The first inference request for each model will take longer due to download time.
 
 **Service management:**
 ```bash
