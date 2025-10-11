@@ -1,9 +1,13 @@
 /server/data/
+/data/
 __pycache__/
 /server/.pytest_cache/
 /.ruff_cache/
 /.mypy_cache/
 /server/.coverage
+
+# Patch files (temporary working files)
+*.patch
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
