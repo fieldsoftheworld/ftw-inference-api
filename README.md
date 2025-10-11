@@ -36,10 +36,11 @@ This script will:
 - Install Pixi package manager
 - Clone the repository and checkout the specified branch
 - Install dependencies using Pixi production environment
-- Download all pre-trained model checkpoints (~800MB total)
 - Enable GPU support in configuration
 - Configure a systemd service for automatic startup
 - Set up log rotation
+
+**Note:** Model weights (~1.5GB total across 8 models) are automatically downloaded on first use and cached at `~/.cache/torch/hub/checkpoints/`. The first inference request for each model will take longer due to download time.
 
 **Service management:**
 ```bash
@@ -65,14 +66,16 @@ sudo journalctl -u ftw-inference-api --since today  # Today's logs
    cp .env.example .env
    # Edit .env to uncomment DynamoDB local settings:
    # DYNAMODB__DYNAMODB_ENDPOINT="http://localhost:8001"
-   # AWS_ACCESS_KEY_ID="fake_key_id"
-   # AWS_SECRET_ACCESS_KEY="fake_secret_key"
    ```
 
 2. **Start services**:
    ```bash
-   pixi run dynamodb-local  # Start DynamoDB Local (port 8001)
-   pixi run start           # Start development server (port 8000)
+   # Terminal 1: Start DynamoDB Local
+   pixi run dynamodb-local
+
+   # Terminal 2: Export AWS credentials (local dev only) and start server
+   export AWS_ACCESS_KEY_ID="test" AWS_SECRET_ACCESS_KEY="test"
+   pixi run start
    ```
 
 ### Alternative: Direct Server Start

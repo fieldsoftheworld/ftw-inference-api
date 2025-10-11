@@ -15,6 +15,7 @@ class ModelInfo(BaseModel):
     requires_polygonize: bool = Field(
         description="Whether this model requires polygonization step"
     )
+    url: str = Field(description="Download or source URL for the model checkpoint")
 
 
 class TaskInfo(BaseModel):

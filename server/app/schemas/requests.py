@@ -1,13 +1,9 @@
 from typing import Literal
 
+from ftw_tools.models.model_registry import MODEL_REGISTRY
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.config import get_settings
-
-# This logic is used for validation and is acceptable at the schema definition level.
-allowed_models = [model.get("id") for model in get_settings().models] or [
-    "default_model"
-]
+allowed_models = list(MODEL_REGISTRY.keys()) or ["default_model"]
 
 
 class PolygonizationRequest(BaseModel):

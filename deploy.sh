@@ -62,30 +62,8 @@ echo "Installing Pixi environment..."
 export PATH="$HOME/.pixi/bin:$PATH"
 pixi install
 
-echo "Downloading FTW model checkpoints..."
-mkdir -p server/data/uploads server/data/results server/data/models server/logs
-BASE_URL="https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/"
-MODELS_DIR="server/data/models"
-
-MODELS=(
-    "2_Class_FULL_FTW_Pretrained.ckpt"
-    "2_Class_CCBY_FTW_Pretrained.ckpt"
-    "3_Class_FULL_FTW_Pretrained.ckpt"
-    "3_Class_CCBY_FTW_Pretrained.ckpt"
-)
-
-for model in "${MODELS[@]}"; do
-    if [ -f "$MODELS_DIR/$model" ]; then
-        echo "$model already exists"
-    else
-        echo "Downloading $model..."
-        if wget -q --show-progress "$BASE_URL$model" -O "$MODELS_DIR/$model"; then
-            echo "$model downloaded"
-        else
-            echo "Failed to download $model"
-        fi
-    fi
-done
+echo "Creating data directories..."
+mkdir -p server/data/uploads server/data/results server/logs
 
 # Create minimal production environment file (optional customizations)
 echo "Creating minimal production environment configuration..."

@@ -5,6 +5,7 @@ from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, UploadFile, status
+from ftw_tools.models.model_registry import MODEL_REGISTRY
 from pynamodb.exceptions import DoesNotExist
 
 from app.core.config import get_settings
@@ -435,15 +436,28 @@ class ProjectService:
         }
 
     def get_api_configuration(self) -> dict[str, Any]:
-        """Get API configuration for root endpoint."""
+        """Get API configuration information."""
         settings = get_settings()
+        models = [
+            {
+                "id": model_id,
+                "title": model_id.replace("_", " ").replace("-", " "),
+                "description": spec.description,
+                "license": spec.license,
+                "version": spec.version,
+                "requires_window": spec.requires_window,
+                "requires_polygonize": spec.requires_polygonize,
+                "url": spec.url,
+            }
+            for model_id, spec in MODEL_REGISTRY.items()
+        ]
         return {
             "api_version": settings.api.version,
             "title": settings.api.title,
             "description": settings.api.description,
             "min_area_km2": settings.processing.min_area_km2,
             "max_area_km2": settings.processing.max_area_km2,
-            "models": settings.models,
+            "models": models,
         }
 
     # --- Internal Helper Methods ---

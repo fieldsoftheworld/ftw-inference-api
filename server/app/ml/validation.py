@@ -2,11 +2,9 @@
 
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from app.core.config import get_settings
 from app.core.geo import calculate_area_km2
 
 
@@ -67,46 +65,6 @@ def validate_image_urls(urls: Any, require_image_urls: bool = False) -> None:
             raise ValueError(f"URL '{url}' is invalid")
 
 
-def validate_model(params: dict[str, Any]) -> None:
-    """Validate model configuration and file existence."""
-    settings = get_settings()
-    model_id = params.get("model")
-
-    model_config = next(
-        (model for model in settings.models if model.get("id") == model_id),
-        None,
-    )
-    if not model_config:
-        raise ValueError(f"Model with ID '{model_id}' not found")
-
-    model_file = model_config.get("file")
-    if not model_file:
-        raise ValueError(f"Model '{model_id}' has no file specified")
-
-    model_path = Path(__file__).parent.parent.parent / "data" / "models" / model_file
-    if not model_path.exists():
-        raise ValueError(f"Model file not found at '{model_path}'")
-
-
-def resolve_model_path(model_id: str) -> str:
-    """Resolve model ID to absolute file path for ML execution."""
-    settings = get_settings()
-
-    model_config = next(
-        (model for model in settings.models if model.get("id") == model_id),
-        None,
-    )
-    if not model_config:
-        raise ValueError(f"Model with ID '{model_id}' not found")
-
-    model_file = model_config.get("file")
-    if not model_file:
-        raise ValueError(f"Model '{model_id}' has no file specified")
-
-    model_path = Path(__file__).parent.parent.parent / "data" / "models" / model_file
-    return str(model_path.absolute())
-
-
 def validate_processing_params(params: dict[str, Any]) -> None:
     """Validate ML processing parameters."""
     if params.get("resize_factor", 1) <= 0:
@@ -164,6 +122,5 @@ def prepare_inference_params(
     """Prepare and validate inference parameters."""
     validate_bbox(params.get("bbox"), require_bbox, max_area)
     validate_image_urls(params.get("images"), require_image_urls)
-    validate_model(params)
     validate_processing_params(params)
     return params

@@ -148,10 +148,9 @@ python-multipart = ">=0.0.6"
 requests = ">=2.28.0"
 pyyaml = ">=6.0"
 watchtower = ">=3.4.0"
-pixi-pycharm = ">=0.0.8,<0.0.10"
 
 [tool.pixi.pypi-dependencies]
-ftw-tools = ">=2.0.0b1"
+ftw-tools = { version = ">=2.0.0b2", extras = ["all"] }
 python-jose = { version = ">=3.3.0", extras = ["cryptography"] }
 # CRITICAL: Must use this exact version to avoid filesystem registration error
 # See: https://github.com/apache/arrow/issues/44696
@@ -190,15 +189,10 @@ lint = { features = ["lint"], solve-group = "default" }
 
 [tool.pixi.tasks]
 # Development tasks
-start = { cmd = "python run.py --debug", cwd = "server", depends-on = ["postinstall", "download-model"] }
+start = { cmd = "python run.py --debug", cwd = "server", depends-on = ["postinstall"] }
 postinstall = "pip install --no-build-isolation --no-deps --disable-pip-version-check -e ."
 
 # Setup tasks
-download-model = { cmd = """
-mkdir -p server/data/models && \
-curl -L -o server/data/models/2_Class_FULL_FTW_Pretrained.ckpt \
-https://github.com/fieldsoftheworld/ftw-baselines/releases/download/v1/2_Class_FULL_FTW_Pretrained.ckpt
-""", outputs = ["server/data/models/2_Class_FULL_FTW_Pretrained.ckpt"] }
 dynamodb-local = { cmd = "docker run -p 8001:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb -inMemory" }
 
 [dependency-groups]
@@ -212,7 +206,7 @@ pytest -v \
   --cov=app \
   --cov-report=xml \
   --cov-report=term-missing
-""", cwd = "server", depends-on = ["postinstall", "download-model"] }
+""", cwd = "server", depends-on = ["postinstall"] }
 
 [tool.pixi.feature.lint.tasks]
 lint = { cmd = "pre-commit run --all-files", depends-on = ["postinstall"] }
