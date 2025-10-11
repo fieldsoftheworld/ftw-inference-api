@@ -65,14 +65,16 @@ sudo journalctl -u ftw-inference-api --since today  # Today's logs
    cp .env.example .env
    # Edit .env to uncomment DynamoDB local settings:
    # DYNAMODB__DYNAMODB_ENDPOINT="http://localhost:8001"
-   # AWS_ACCESS_KEY_ID="fake_key_id"
-   # AWS_SECRET_ACCESS_KEY="fake_secret_key"
    ```
 
 2. **Start services**:
    ```bash
-   pixi run dynamodb-local  # Start DynamoDB Local (port 8001)
-   pixi run start           # Start development server (port 8000)
+   # Terminal 1: Start DynamoDB Local
+   pixi run dynamodb-local
+
+   # Terminal 2: Export AWS credentials (local dev only) and start server
+   export AWS_ACCESS_KEY_ID="test" AWS_SECRET_ACCESS_KEY="test"
+   pixi run start
    ```
 
 ### Alternative: Direct Server Start
