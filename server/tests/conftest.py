@@ -48,3 +48,40 @@ def client(dynamodb_tables, mock_queue, tmp_path):
 
     with TestClient(app) as c:
         yield c
+
+
+# Test data fixtures for model validation tests
+@pytest.fixture
+def sample_bbox():
+    """Standard test bounding box (San Francisco Bay Area)."""
+    return [-122.0, 37.0, -121.0, 38.0]
+
+
+@pytest.fixture
+def sample_image_urls():
+    """Standard test image URLs."""
+    return {
+        "single": ["https://example.com/a.tif"],
+        "dual": ["https://example.com/a.tif", "https://example.com/b.tif"],
+    }
+
+
+@pytest.fixture
+def model_ids():
+    """Standard test model IDs."""
+    return {
+        "single_window": "3_Class_FULL_singleWindow_v2",
+        "dual_window": "2_Class_FULL_v1",
+    }
+
+
+@pytest.fixture
+def create_test_project(client):
+    """Factory fixture to create test projects."""
+
+    def _create_project(title: str = "Test Project"):
+        response = client.post("/v1/projects", json={"title": title})
+        assert response.status_code == 201
+        return response.json()["id"]
+
+    return _create_project

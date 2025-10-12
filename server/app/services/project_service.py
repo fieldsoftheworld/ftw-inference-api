@@ -240,7 +240,7 @@ class ProjectService:
             actions=[
                 Project.parameters.set(json.dumps(params)),
                 Project.status.set(ProjectStatus.QUEUED.value),
-                Project.progress.set(None),
+                Project.progress.remove(),
             ]
         )
 
@@ -255,7 +255,7 @@ class ProjectService:
             actions=[
                 Project.parameters.set(json.dumps(params)),
                 Project.status.set(ProjectStatus.QUEUED.value),
-                Project.progress.set(None),
+                Project.progress.remove(),
             ]
         )
 
@@ -484,7 +484,7 @@ class ProjectService:
             actions=[
                 Project.parameters.set(json.dumps(parameters)),
                 Project.status.set(ProjectStatus.QUEUED.value),
-                Project.progress.set(None),
+                Project.progress.remove(),
             ]
         )
 

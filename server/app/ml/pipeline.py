@@ -19,11 +19,11 @@ logger = get_logger(__name__)
 async def download_images(
     image_file: Path,
     win_a: str,
-    win_b: str,
+    win_b: str | None,
     bbox: list[float],
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Download satellite images using ftw tool."""
+    """Download satellite images using ftw tool. Handles both single and dual window."""
     download_start = time.time()
     logger.info("Downloading images", context)
 
@@ -96,12 +96,12 @@ async def execute_inference_pipeline(
     inference_file: Path,
     bbox: list[float],
     win_a: str,
-    win_b: str,
+    win_b: str | None,
     inference_params: dict[str, Any],
     context: dict[str, Any] | None = None,
     gpu: int | None = None,
 ) -> dict[str, Any]:
-    """Execute complete inference pipeline from download to inference."""
+    """Execute ML inference pipeline with single/dual window support."""
     start_time = time.time()
 
     try:

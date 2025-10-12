@@ -15,7 +15,7 @@ from app.core.logging import get_logger
 from app.core.secrets import get_secrets_manager
 
 if TYPE_CHECKING:
-    from mypy_boto3_s3.client import S3Client
+    from types_aiobotocore_s3.client import S3Client
 
 logger = get_logger(__name__)
 

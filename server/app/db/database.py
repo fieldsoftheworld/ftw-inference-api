@@ -1,7 +1,6 @@
 from app.db.models import Image, InferenceResult, Project
-from app.db.protocols import DynamoTable
 
-TABLES: tuple[type[DynamoTable], ...] = (Image, InferenceResult, Project)
+TABLES = (Image, InferenceResult, Project)
 LOCAL_CAPACITY = 1
 
 

@@ -1,9 +1,12 @@
 from typing import Literal
 
 from ftw_tools.models.model_registry import MODEL_REGISTRY
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.core.logging import get_logger
 
 allowed_models = list(MODEL_REGISTRY.keys()) or ["default_model"]
+logger = get_logger(__name__)
 
 
 class PolygonizationRequest(BaseModel):
@@ -46,6 +49,41 @@ class InferenceRequest(BaseModel):
         None, description="Pixels to discard from each side of the patch"
     )
 
+    @field_validator("model")
+    @classmethod
+    def validate_model_exists(cls, v: str) -> str:
+        """Ensure model exists in registry."""
+        if v not in MODEL_REGISTRY:
+            available = ", ".join(list(MODEL_REGISTRY.keys())[:3]) + "..."
+            raise ValueError(
+                f"Unknown model '{v}'. Available models include: {available}. "
+                f"Use GET /v1/models to see all available models."
+            )
+        return v
+
+    @model_validator(mode="after")
+    def validate_image_count_for_model(self) -> "InferenceRequest":
+        """Validate image count matches model requirements."""
+        if self.images is None:
+            return self  # Skip validation if no images provided
+
+        model_spec = MODEL_REGISTRY.get(self.model)
+        if not model_spec:
+            return self  # Model validation handled above
+
+        expected_count = 2 if model_spec.requires_window else 1
+        actual_count = len(self.images)
+
+        if actual_count != expected_count:
+            window_type = (
+                "temporal windows" if model_spec.requires_window else "single window"
+            )
+            raise ValueError(
+                f"Model '{self.model}' requires exactly {expected_count} "
+                f"image(s) ({window_type}), but {actual_count} provided"
+            )
+        return self
+
 
 class ExampleWorkflowRequest(BaseModel):
     """Parameters for running the example workflow."""
@@ -62,6 +100,21 @@ class ExampleWorkflowRequest(BaseModel):
     model_config = ConfigDict(
         extra="ignore",  # Ignore additional fields
     )
+
+    @model_validator(mode="after")
+    def validate_polygonization_compatibility(self) -> "ExampleWorkflowRequest":
+        """Warn if polygonization requested for models that don't need it."""
+        if not self.inference or not self.polygons:
+            return self
+
+        model_spec = MODEL_REGISTRY.get(self.inference.model)
+        if model_spec and not model_spec.requires_polygonize:
+            # Just log warning, don't fail - user might want raw output anyway
+            logger.warning(
+                f"Model '{self.inference.model}' outputs GeoJSON directly. "
+                f"Polygonization parameters will be ignored."
+            )
+        return self
 
 
 class SceneSelectionRequest(BaseModel):

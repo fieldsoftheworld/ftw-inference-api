@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, File, Header, UploadFile, status
+from fastapi import APIRouter, File, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from ftw_tools.models.model_registry import MODEL_REGISTRY
 
 from app.schemas.requests import (
     CreateProjectRequest,
@@ -245,6 +246,62 @@ async def scene_selection(
     """Find optimal Sentinel-2 scenes for specified area and time."""
     result = await inference_service.run_scene_selection(params.model_dump())
     return SceneSelectionResponse(**result)
+
+
+@router.get("/models", status_code=status.HTTP_200_OK)
+async def list_models() -> dict[str, Any]:
+    """List all available models with their capabilities."""
+    models = [
+        {
+            "id": model_id,
+            "description": spec.description,
+            "license": spec.license,
+            "version": spec.version,
+            "requires_window": spec.requires_window,
+            "requires_polygonize": spec.requires_polygonize,
+            "image_count": 2 if spec.requires_window else 1,
+        }
+        for model_id, spec in MODEL_REGISTRY.items()
+    ]
+    return {"models": models, "total": len(models)}
+
+
+@router.get("/models/{model_id}", status_code=status.HTTP_200_OK)
+async def get_model(model_id: str) -> dict[str, Any]:
+    """Get detailed information about a specific model."""
+    spec = MODEL_REGISTRY.get(model_id)
+    if not spec:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Model '{model_id}' not found. "
+                "Use GET /v1/models to see available models."
+            ),
+        )
+
+    return {
+        "id": model_id,
+        "description": spec.description,
+        "license": spec.license,
+        "version": spec.version,
+        "url": spec.url,
+        "requires_window": spec.requires_window,
+        "requires_polygonize": spec.requires_polygonize,
+        "image_count": 2 if spec.requires_window else 1,
+        "usage_example": {
+            "inference": {
+                "model": model_id,
+                "images": ["<url1>"]
+                if not spec.requires_window
+                else ["<url1>", "<url2>"],
+                "bbox": [-122.5, 37.5, -122.0, 38.0],
+                "resize_factor": 2,
+            },
+            "polygons": {"simplify": 15, "min_size": 500}
+            if spec.requires_polygonize
+            else None,
+        },
+    }
 
 
 @router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
