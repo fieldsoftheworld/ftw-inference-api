@@ -4,17 +4,18 @@ This project provides a FastAPI-based implementation of the Fields of the World 
 
 ## Installation
 
-1. Install [Pixi](https://pixi.sh/):
+1. Install [UV](https://docs.astral.sh/uv/):
    ```bash
-   curl -fsSL https://pixi.sh/install.sh | sh  # macOS/Linux
-   # or: brew install pixi
+   curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux/WSL
+   # or: brew install uv  # macOS
+   # or: pip install uv   # Any platform
    ```
 
 2. Clone and setup:
    ```bash
    git clone https://github.com/fieldsoftheworld/ftw-inference-api
    cd ftw-inference-api
-   pixi install
+   uv sync --group dev
    ```
 
 ## Deployment
@@ -33,9 +34,9 @@ curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/mai
 ```
 
 This script will:
-- Install Pixi package manager
+- Install UV package manager
 - Clone the repository and checkout the specified branch
-- Install dependencies using Pixi production environment
+- Install production dependencies using UV
 - Enable GPU support in configuration
 - Configure a systemd service for automatic startup
 - Set up log rotation
@@ -71,22 +72,22 @@ sudo journalctl -u ftw-inference-api --since today  # Today's logs
 2. **Start services**:
    ```bash
    # Terminal 1: Start DynamoDB Local
-   pixi run dynamodb-local
+   docker run -p 8001:8000 amazon/dynamodb-local:latest -jar DynamoDBLocal.jar -sharedDb -inMemory
 
    # Terminal 2: Export AWS credentials (local dev only) and start server
    export AWS_ACCESS_KEY_ID="test" AWS_SECRET_ACCESS_KEY="test"
-   pixi run start
+   cd server && uv run python run.py --debug
    ```
 
 ### Alternative: Direct Server Start
 
 ```bash
-pixi run start  # Development server with debug mode and auto reload
+cd server && uv run python run.py --debug  # Development server with debug mode and auto reload
 ```
 
-Or run directly with options:
+Or run with custom options:
 ```bash
-pixi run python server/run.py --host 127.0.0.1 --port 8080 --debug
+cd server && uv run python run.py --host 127.0.0.1 --port 8080 --debug
 ```
 
 **Command-line options:**
@@ -102,7 +103,7 @@ The server loads configuration from `server/config/base.toml` by default. Settin
 You can specify a custom configuration file using the `--config` command-line option:
 
 ```bash
-python run.py --config /path/to/custom_config.toml
+cd server && uv run python run.py --config /path/to/custom_config.toml
 ```
 
 ## API Endpoints
@@ -164,20 +165,20 @@ server/
 Uses [Ruff](https://docs.astral.sh/ruff/) for linting/formatting and pre-commit hooks for quality checks.
 
 ```bash
-pixi run lint     # Run all pre-commit hooks
-pixi run format   # Format code
-pixi run check    # Check without fixing
+uv run ruff check .           # Check code without fixing
+uv run ruff format .          # Auto-format code
+uv run mypy server/app        # Type check
 ```
 
 Setup pre-commit:
 ```bash
-pixi run pre-commit install
+uv run pre-commit install
 ```
 
 ### Running Tests
 
 ```bash
-pixi run test  # All tests with coverage
+cd server && uv run pytest -v --cov=app --cov-report=xml --cov-report=term-missing
 ```
 
 ## License
