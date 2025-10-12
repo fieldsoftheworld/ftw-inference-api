@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deployment script for Ubuntu Deep Learning AMI instances with Pixi and systemd service
+# Deployment script for Ubuntu Deep Learning AMI instances with UV and systemd service
 
 set -e
 
@@ -31,17 +31,17 @@ sudo apt-get update
 sudo apt-get upgrade -y
 
 echo "Installing system dependencies..."
-sudo apt-get install -y  curl
+sudo apt-get install -y curl python3.12 python3.12-venv
 
-echo "Installing Pixi..."
-if command -v pixi &> /dev/null; then
-    echo "Pixi already installed, skipping..."
+echo "Installing UV..."
+if command -v uv &> /dev/null; then
+    echo "UV already installed, skipping..."
 else
-    curl -fsSL https://pixi.sh/install.sh | sh
-    # Add pixi to PATH for current session
-    export PATH="$HOME/.pixi/bin:$PATH"
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # Add uv to PATH for current session
+    export PATH="$HOME/.local/bin:$PATH"
     # Add to bashrc for future sessions
-    echo 'export PATH="$HOME/.pixi/bin:$PATH"' >> ~/.bashrc
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 fi
 
 echo "Cloning repository..."
@@ -57,10 +57,10 @@ else
     cd ftw-inference-api
 fi
 
-echo "Installing Pixi environment..."
-# Ensure pixi is in PATH for this command
-export PATH="$HOME/.pixi/bin:$PATH"
-pixi install
+echo "Installing Python dependencies with UV..."
+# Ensure uv is in PATH for this command
+export PATH="$HOME/.local/bin:$PATH"
+uv sync
 
 echo "Creating data directories..."
 mkdir -p server/data/uploads server/data/results server/logs
@@ -91,16 +91,8 @@ APP_DIR="$(pwd)"
 USER="$(whoami)"
 HOME_DIR="$(eval echo ~$USER)"
 
-# Conditionally build the ExecStart command based on the GPU configuration.
-# We check the final destination of the production.env file.
-BASE_EXEC_START="${HOME_DIR}/.pixi/bin/pixi run --environment production python run.py --host 0.0.0.0 --port 8000"
-EXEC_START_CMD=$BASE_EXEC_START
-
-if grep -q "PROCESSING__GPU=null" /etc/ftw-inference-api/production.env; then
-    echo "GPU is disabled. Applying CONDA_OVERRIDE_GLIBC to the service."
-    # Prepend the environment variable directly to the command.
-    EXEC_START_CMD="CONDA_OVERRIDE_GLIBC=2.17 ${BASE_EXEC_START}"
-fi
+# Build the ExecStart command using UV
+BASE_EXEC_START="${HOME_DIR}/.local/bin/uv run python run.py --host 0.0.0.0 --port 8000"
 
 sudo tee /etc/systemd/system/ftw-inference-api.service > /dev/null <<EOF
 [Unit]
@@ -113,10 +105,9 @@ User=${USER}
 Group=${USER}
 WorkingDirectory=${APP_DIR}/server
 # Set a reliable PATH for the service environment.
-Environment="PATH=${HOME_DIR}/.pixi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PATH=${HOME_DIR}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=/etc/ftw-inference-api/production.env
-# Use /bin/sh -c to correctly process the command string with the conditional variable.
-ExecStart=/bin/sh -c "${EXEC_START_CMD}"
+ExecStart=${BASE_EXEC_START}
 Restart=always
 RestartSec=10
 StandardOutput=journal
