@@ -10,17 +10,19 @@ from fastapi.testclient import TestClient
 
 
 @pytest.mark.asyncio
-async def test_full_inference_success_workflow(client: TestClient, dynamodb_tables):
+async def test_full_inference_success_workflow(
+    client: TestClient,
+    dynamodb_tables,
+    create_test_project,
+    model_ids,
+    sample_image_urls,
+):
     """Test complete inference workflow from task submission to result retrieval."""
-    create_response = client.post(
-        "/v1/projects", json={"title": "Workflow Success Test"}
-    )
-    assert create_response.status_code == 201
-    project_id = create_response.json()["id"]
+    project_id = create_test_project("Workflow Success Test")
 
     inference_params = {
-        "model": "2_Class_FULL_v1",
-        "images": ["https://example.com/a.tif", "https://example.com/b.tif"],
+        "model": model_ids["dual_window"],
+        "images": sample_image_urls["dual"],
     }
     submit_response = client.put(
         f"/v1/projects/{project_id}/inference", json=inference_params
@@ -62,17 +64,21 @@ async def test_full_inference_success_workflow(client: TestClient, dynamodb_tabl
 
 
 @pytest.mark.asyncio
-async def test_task_failure_reporting(client: TestClient, mock_queue, dynamodb_tables):
+async def test_task_failure_reporting(
+    client: TestClient,
+    mock_queue,
+    dynamodb_tables,
+    create_test_project,
+    model_ids,
+    sample_image_urls,
+):
     """Test that task failures are properly reported to the user."""
-    create_response = client.post(
-        "/v1/projects", json={"title": "Workflow Failure Test"}
-    )
-    project_id = create_response.json()["id"]
+    project_id = create_test_project("Workflow Failure Test")
     submit_response = client.put(
         f"/v1/projects/{project_id}/inference",
         json={
-            "model": "2_Class_FULL_v1",
-            "images": ["https://a.com/1.tif", "https://b.com/2.tif"],
+            "model": model_ids["dual_window"],
+            "images": sample_image_urls["dual"],
         },
     )
     task_id = submit_response.json()["task_id"]
@@ -101,15 +107,15 @@ async def test_task_failure_reporting(client: TestClient, mock_queue, dynamodb_t
 
 
 @pytest.mark.asyncio
-async def test_inference_with_invalid_model(client: TestClient):
+async def test_inference_with_invalid_model(
+    client: TestClient, create_test_project, sample_image_urls
+):
     """Test that invalid model parameters are rejected at the API boundary."""
-    create_response = client.post("/v1/projects", json={"title": "Invalid Model Test"})
-    assert create_response.status_code == 201
-    project_id = create_response.json()["id"]
+    project_id = create_test_project("Invalid Model Test")
 
     inference_params = {
         "model": "this-model-does-not-exist",
-        "images": ["https://example.com/a.tif", "https://example.com/b.tif"],
+        "images": sample_image_urls["dual"],
     }
     submit_response = client.put(
         f"/v1/projects/{project_id}/inference", json=inference_params

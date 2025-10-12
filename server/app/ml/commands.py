@@ -5,11 +5,11 @@ from typing import Any
 
 
 def build_download_command(
-    image_file: Path, win_a: str, win_b: str, bbox: list[float]
+    image_file: Path, win_a: str, win_b: str | None, bbox: list[float]
 ) -> list[str]:
-    """Build ftw download command for image acquisition."""
+    """Build ftw download command. Handles both single and dual window."""
     bbox_str = ",".join(map(str, bbox))
-    return [
+    cmd = [
         "ftw",
         "inference",
         "download",
@@ -17,11 +17,15 @@ def build_download_command(
         str(image_file.absolute()),
         "--win_a",
         win_a,
-        "--win_b",
-        win_b,
         "--bbox",
         bbox_str,
     ]
+
+    # Only add win_b if provided (for dual-window models)
+    if win_b is not None:
+        cmd.extend(["--win_b", win_b])
+
+    return cmd
 
 
 def build_inference_command(

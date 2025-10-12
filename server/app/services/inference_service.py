@@ -6,6 +6,7 @@ from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, status
+from ftw_tools.models.model_registry import MODEL_REGISTRY
 
 from app.core.config import get_settings
 from app.core.geo import calculate_area_km2
@@ -235,7 +236,20 @@ class InferenceService:
         project_id: str,
         params: dict[str, Any],
     ) -> dict[str, Any]:
-        """Run polygonization for a project."""
+        """Run polygonization for a project (if supported by model)."""
+        project = await self.project_service.get_project(project_id)
+        inference_params = json.loads(project.inference_params or "{}")
+        model_id = inference_params.get("model")
+
+        if model_id:
+            model_spec = MODEL_REGISTRY.get(model_id)
+            if model_spec and not model_spec.requires_polygonize:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Model '{model_id}' outputs GeoJSON directly "
+                    f"and does not support polygonization",
+                )
+
         start_time = time.time()
         uid = str(uuid.uuid4())
 
@@ -316,7 +330,7 @@ class InferenceService:
         ndjson: bool = False,
         gpu: int | None = None,
     ) -> str | dict[str, Any]:
-        """Run complete ML pipeline for example workflow."""
+        """Run ML pipeline for example workflow with conditional polygonization."""
         uid = str(uuid.uuid4())
         temp_dir = Path("data/temp")
         image_file = temp_dir / f"{uid}.tif"
@@ -324,8 +338,19 @@ class InferenceService:
         polygon_file = temp_dir / f"{uid}.{'ndjson' if ndjson else 'json'}"
 
         bbox = inference_params["bbox"]
-        win_a = inference_params["images"][0]
-        win_b = inference_params["images"][1]
+        images = inference_params["images"]
+
+        model_spec = MODEL_REGISTRY.get(inference_params["model"])
+        requires_polygonization = model_spec.requires_polygonize if model_spec else True
+
+        if model_spec and not model_spec.requires_window:
+            # Single-window model
+            win_a = images[0]
+            win_b = None
+        else:
+            # Dual-window model (default)
+            win_a = images[0]
+            win_b = images[1] if len(images) > 1 else None
 
         context = {
             "ml_metrics": {
@@ -337,7 +362,7 @@ class InferenceService:
                     "max_lat": bbox[3],
                 },
                 "bbox_area_km2": calculate_area_km2(bbox),
-                "image_urls": [win_a, win_b],
+                "image_urls": [win_a] if win_b is None else [win_a, win_b],
                 "model_path": inference_params.get("model", "unknown"),
                 "gpu_enabled": gpu is not None,
             }
@@ -355,35 +380,53 @@ class InferenceService:
                 gpu=gpu,
             )
 
-            polygon_result = await run_polygonize(
-                inference_file, polygon_file, polygon_params, context
-            )
+            if requires_polygonization and polygon_params:
+                polygon_result = await run_polygonize(
+                    inference_file, polygon_file, polygon_params, context
+                )
 
-            async with aiofiles.open(polygon_file) as f:
+                async with aiofiles.open(polygon_file) as f:
+                    if ndjson:
+                        data: str | dict[str, Any] = await f.read()
+                    else:
+                        content = await f.read()
+                        data = json.loads(content)
+
                 if ndjson:
-                    data: str | dict[str, Any] = await f.read()
+                    if isinstance(data, str):
+                        polygons_generated = (
+                            len(data.strip().split("\n")) if data.strip() else 0
+                        )
+                    else:
+                        polygons_generated = 0
                 else:
+                    features = (
+                        data.get("features", []) if isinstance(data, dict) else []
+                    )
+                    polygons_generated = len(features)
+
+                self._log_ml_success(
+                    "pipeline",
+                    polygons_generated=polygons_generated,
+                    output_format="ndjson" if ndjson else "geojson",
+                    **inference_result,
+                    **polygon_result,
+                )
+            else:
+                # Model outputs GeoJSON directly, read from inference result
+                async with aiofiles.open(inference_file) as f:
                     content = await f.read()
                     data = json.loads(content)
 
-            if ndjson:
-                if isinstance(data, str):
-                    polygons_generated = (
-                        len(data.strip().split("\n")) if data.strip() else 0
-                    )
-                else:
-                    polygons_generated = 0
-            else:
                 features = data.get("features", []) if isinstance(data, dict) else []
                 polygons_generated = len(features)
 
-            self._log_ml_success(
-                "pipeline",
-                polygons_generated=polygons_generated,
-                output_format="ndjson" if ndjson else "geojson",
-                **inference_result,
-                **polygon_result,
-            )
+                self._log_ml_success(
+                    "pipeline",
+                    polygons_generated=polygons_generated,
+                    output_format="geojson",
+                    **inference_result,
+                )
 
             return data
 
@@ -399,13 +442,21 @@ class InferenceService:
         project_id: str,
         params: dict[str, Any],
     ) -> dict[str, Any]:
-        """Run inference using URL-based image processing."""
+        """Run URL-based inference with model-aware window handling."""
         uid = str(uuid.uuid4())
         inference_result_key = f"projects/{project_id}/results/inference_{uid}.tif"
 
         bbox = params["bbox"]
-        win_a = params["images"][0]
-        win_b = params["images"][1]
+        images = params["images"]
+
+        # Determine window count based on model type
+        model_spec = MODEL_REGISTRY.get(params["model"])
+        if model_spec and not model_spec.requires_window:
+            win_a = images[0]
+            win_b = None
+        else:
+            win_a = images[0]
+            win_b = images[1] if len(images) > 1 else None
 
         context = {
             "ml_metrics": {
