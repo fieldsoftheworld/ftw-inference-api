@@ -30,9 +30,6 @@ echo "Updating system packages..."
 sudo apt-get update
 sudo apt-get upgrade -y
 
-echo "Installing system dependencies..."
-sudo apt-get install -y curl python3.12 python3.12-venv
-
 echo "Installing UV..."
 if command -v uv &> /dev/null; then
     echo "UV already installed, skipping..."
@@ -43,6 +40,9 @@ else
     # Add to bashrc for future sessions
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 fi
+
+echo "Installing Python 3.12 via UV..."
+uv python install 3.12
 
 echo "Cloning repository..."
 cd ~
