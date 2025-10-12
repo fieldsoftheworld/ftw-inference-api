@@ -238,7 +238,9 @@ class InferenceService:
     ) -> dict[str, Any]:
         """Run polygonization for a project (if supported by model)."""
         project = await self.project_service.get_project(project_id)
-        inference_params = json.loads(project.inference_params or "{}")
+        inference_params = (
+            project.parameters.get("inference", {}) if project.parameters else {}
+        )
         model_id = inference_params.get("model")
 
         if model_id:
