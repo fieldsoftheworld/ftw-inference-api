@@ -18,7 +18,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "ftw-tools>=2.0.0b2",
+    "ftw-tools[all]>=2.0.0b2",
     "fastapi>=0.116.1",
     "uvicorn[standard]>=0.35.0",
     "aiofiles>=23.0.0",
@@ -84,6 +84,10 @@ exclude = [
     "^server/tests/.*$"
 ]
 
+[[tool.mypy.overrides]]
+module = "ftw_tools.*"
+ignore_missing_imports = true
+
 [tool.bandit]
 exclude_dirs = ["server/tests"]
 skips = ["B101"]
@@ -123,5 +127,4 @@ dev = [
     "types-aiofiles>=24.1.0",
     "types-python-jose>=3.5.0.20250531",
     "types-aioboto3>=13.0.0",
-    "mypy-boto3-s3>=1.39.5,<2",
 ]
