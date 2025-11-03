@@ -84,9 +84,21 @@ class TestCacheIntegration:
     async def test_multiple_scenes_cached(self, temp_cache_dir, sample_image_file):
         """Test that multiple different scenes can be cached."""
         scenes = [
-            ("2023-01-01_2023-03-31", "2023-04-01_2023-06-30", [10.0, 20.0, 10.5, 20.5]),
-            ("2023-07-01_2023-09-30", "2023-10-01_2023-12-31", [11.0, 21.0, 11.5, 21.5]),
-            ("2024-01-01_2024-03-31", "2024-04-01_2024-06-30", [12.0, 22.0, 12.5, 22.5]),
+            (
+                "2023-01-01_2023-03-31",
+                "2023-04-01_2023-06-30",
+                [10.0, 20.0, 10.5, 20.5],
+            ),
+            (
+                "2023-07-01_2023-09-30",
+                "2023-10-01_2023-12-31",
+                [11.0, 21.0, 11.5, 21.5],
+            ),
+            (
+                "2024-01-01_2024-03-31",
+                "2024-04-01_2024-06-30",
+                [12.0, 22.0, 12.5, 22.5],
+            ),
         ]
 
         # Cache all scenes
@@ -100,7 +112,9 @@ class TestCacheIntegration:
             assert path is not None
 
     @pytest.mark.asyncio
-    async def test_cached_file_content_preserved(self, temp_cache_dir, sample_image_file):
+    async def test_cached_file_content_preserved(
+        self, temp_cache_dir, sample_image_file
+    ):
         """Test that cached file content is preserved correctly."""
         win_a = "2023-01-01_2023-03-31"
         win_b = "2023-04-01_2023-06-30"
@@ -124,7 +138,9 @@ class TestCacheIntegration:
         assert cached_content == original_content
 
     @pytest.mark.asyncio
-    async def test_different_bbox_different_cache(self, temp_cache_dir, sample_image_file):
+    async def test_different_bbox_different_cache(
+        self, temp_cache_dir, sample_image_file
+    ):
         """Test that different bboxes create different cache entries."""
         win_a = "2023-01-01_2023-03-31"
         win_b = "2023-04-01_2023-06-30"
