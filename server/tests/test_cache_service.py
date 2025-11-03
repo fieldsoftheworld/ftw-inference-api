@@ -1,9 +1,6 @@
 """Tests for cache service functionality."""
 
-import tempfile
 from pathlib import Path
-
-import pytest
 
 from app.services.cache_service import (
     extract_year_from_window,

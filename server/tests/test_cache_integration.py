@@ -1,14 +1,11 @@
 """Integration tests for S2 scene caching."""
 
-import shutil
 import tempfile
 from pathlib import Path
 
 import pytest
-
 from app.services.cache_service import (
     check_s2_scene_exists,
-    get_cache_dir,
     save_to_cache,
 )
 
