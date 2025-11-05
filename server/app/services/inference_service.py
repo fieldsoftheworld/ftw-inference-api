@@ -124,7 +124,6 @@ class InferenceService:
             inference_params = self.prepare_inference_params(
                 params["inference"],
                 require_bbox=True,
-                require_image_urls=True,
                 max_area=settings.processing.max_area_km2,
             )
             polygon_params = params.get("polygons", {})
