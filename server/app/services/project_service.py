@@ -5,7 +5,7 @@ from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, UploadFile, status
-from ftw_tools.models.model_registry import MODEL_REGISTRY
+from ftw_tools.inference.model_registry import MODEL_REGISTRY
 from pynamodb.exceptions import DoesNotExist
 
 from app.core.config import get_settings
@@ -448,6 +448,8 @@ class ProjectService:
                 "requires_window": spec.requires_window,
                 "requires_polygonize": spec.requires_polygonize,
                 "url": spec.url,
+                "default": spec.default,
+                "legacy": spec.legacy,
             }
             for model_id, spec in MODEL_REGISTRY.items()
         ]

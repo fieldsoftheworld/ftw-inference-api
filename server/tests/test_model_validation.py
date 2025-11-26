@@ -102,8 +102,8 @@ class TestModelEndpoints:
     @pytest.mark.parametrize(
         "model_id,expected_requires_window,expected_image_count",
         [
-            ("3_Class_FULL_singleWindow_v2", False, 1),
-            ("2_Class_FULL_v1", True, 2),
+            ("FTW_v2_3_Class_FULL_singleWindow", False, 1),
+            ("FTW_v1_2_Class_FULL", True, 2),
         ],
     )
     def test_get_model_endpoint(

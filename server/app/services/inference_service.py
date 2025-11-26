@@ -6,7 +6,7 @@ from typing import Any
 
 import aiofiles
 from fastapi import HTTPException, status
-from ftw_tools.models.model_registry import MODEL_REGISTRY
+from ftw_tools.inference.model_registry import MODEL_REGISTRY
 
 from app.core.config import get_settings
 from app.core.geo import calculate_area_km2

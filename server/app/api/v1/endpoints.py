@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, File, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from ftw_tools.models.model_registry import MODEL_REGISTRY
+from ftw_tools.inference.model_registry import MODEL_REGISTRY
 
 from app.schemas.requests import (
     CreateProjectRequest,
@@ -260,6 +260,8 @@ async def list_models() -> dict[str, Any]:
             "requires_window": spec.requires_window,
             "requires_polygonize": spec.requires_polygonize,
             "image_count": 2 if spec.requires_window else 1,
+            "default": spec.default,
+            "legacy": spec.legacy,
         }
         for model_id, spec in MODEL_REGISTRY.items()
     ]
@@ -288,6 +290,8 @@ async def get_model(model_id: str) -> dict[str, Any]:
         "requires_window": spec.requires_window,
         "requires_polygonize": spec.requires_polygonize,
         "image_count": 2 if spec.requires_window else 1,
+        "default": spec.default,
+        "legacy": spec.legacy,
         "usage_example": {
             "inference": {
                 "model": model_id,

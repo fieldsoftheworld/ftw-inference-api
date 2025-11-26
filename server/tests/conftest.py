@@ -70,8 +70,8 @@ def sample_image_urls():
 def model_ids():
     """Standard test model IDs."""
     return {
-        "single_window": "3_Class_FULL_singleWindow_v2",
-        "dual_window": "2_Class_FULL_v1",
+        "single_window": "FTW_v2_3_Class_FULL_singleWindow",
+        "dual_window": "FTW_v1_2_Class_FULL",
     }
 
 
