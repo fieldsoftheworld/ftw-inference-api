@@ -16,6 +16,12 @@ class ModelInfo(BaseModel):
         description="Whether this model requires polygonization step"
     )
     url: str = Field(description="Download or source URL for the model checkpoint")
+    default: bool = Field(
+        default=False, description="Whether this is the default recommended model"
+    )
+    legacy: bool = Field(
+        default=False, description="Whether this is a legacy model (older version)"
+    )
 
 
 class TaskInfo(BaseModel):

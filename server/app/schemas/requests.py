@@ -1,6 +1,6 @@
 from typing import Literal
 
-from ftw_tools.models.model_registry import MODEL_REGISTRY
+from ftw_tools.inference.model_registry import MODEL_REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.logging import get_logger
