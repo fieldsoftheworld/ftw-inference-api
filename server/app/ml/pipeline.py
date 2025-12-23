@@ -10,6 +10,7 @@ from app.core.utils import run_async
 from app.ml.commands import (
     build_download_command,
     build_inference_command,
+    build_instance_segmentation_command,
     build_polygonize_command,
 )
 
@@ -88,6 +89,36 @@ async def run_polygonize(
 
     return {
         "polygonize_time_ms": polygonize_time,
+    }
+
+
+async def run_instance_segmentation(
+    image_file: Path,
+    output_file: Path,
+    params: dict[str, Any],
+    context: dict[str, Any] | None = None,
+    gpu: int | None = None,
+) -> dict[str, Any]:
+    """Run instance segmentation inference (outputs GeoJSON directly)."""
+    settings = get_settings()
+    start_time = time.time()
+
+    if context:
+        logger.info("Starting instance segmentation", extra=context)
+
+    cmd = build_instance_segmentation_command(image_file, output_file, params)
+
+    if gpu is not None:
+        cmd.extend(["--gpu", str(gpu)])
+    elif settings.processing.gpu is not None:
+        cmd.extend(["--gpu", str(settings.processing.gpu)])
+
+    await run_async(cmd)
+
+    inference_time = round((time.time() - start_time) * 1000, 2)
+
+    return {
+        "inference_time_ms": inference_time,
     }
 
 

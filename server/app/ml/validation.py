@@ -49,12 +49,17 @@ def validate_bbox(
 
 
 def validate_image_urls(urls: Any, require_image_urls: bool = False) -> None:
-    """Validate image URLs format and structure."""
+    """Validate image URLs format and structure.
+
+    Accepts 1 or 2 image URLs. Single-window models require 1 image,
+    dual-window models require 2. The service layer handles model-specific
+    validation.
+    """
     if not require_image_urls:
         return
 
-    if not isinstance(urls, list) or len(urls) != 2:
-        raise ValueError("Images must be a list of two items")
+    if not isinstance(urls, list) or len(urls) not in (1, 2):
+        raise ValueError("Images must be a list of one or two items")
 
     matcher = re.compile(r"^https?://[\w/.-]+$", re.A | re.I)
     for url in urls:

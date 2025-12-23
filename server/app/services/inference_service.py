@@ -17,8 +17,10 @@ from app.core.utils import run_async
 from app.db.models import InferenceResult
 from app.ml import (
     build_polygonize_command,
+    download_images,
     execute_inference_pipeline,
     prepare_inference_params,
+    run_instance_segmentation,
     run_polygonize,
 )
 from app.ml.commands import build_scene_selection_command
@@ -335,21 +337,20 @@ class InferenceService:
         uid = str(uuid.uuid4())
         temp_dir = Path("data/temp")
         image_file = temp_dir / f"{uid}.tif"
-        inference_file = temp_dir / f"{uid}.inference.tif"
-        polygon_file = temp_dir / f"{uid}.{'ndjson' if ndjson else 'json'}"
 
         bbox = inference_params["bbox"]
         images = inference_params["images"]
 
         model_spec = MODEL_REGISTRY.get(inference_params["model"])
+        is_instance_segmentation = (
+            model_spec.instance_segmentation if model_spec else False
+        )
         requires_polygonization = model_spec.requires_polygonize if model_spec else True
 
         if model_spec and not model_spec.requires_window:
-            # Single-window model
             win_a = images[0]
             win_b = None
         else:
-            # Dual-window model (default)
             win_a = images[0]
             win_b = images[1] if len(images) > 1 else None
 
@@ -368,6 +369,42 @@ class InferenceService:
                 "gpu_enabled": gpu is not None,
             }
         }
+
+        if is_instance_segmentation:
+            # Instance segmentation: download + run-instance-segmentation
+            output_file = temp_dir / f"{uid}.geojson"
+            try:
+                download_result = await download_images(
+                    image_file, win_a, win_b, bbox, context
+                )
+                inference_result = await run_instance_segmentation(
+                    image_file, output_file, inference_params, context, gpu
+                )
+
+                async with aiofiles.open(output_file) as f:
+                    content = await f.read()
+                    data: str | dict[str, Any] = json.loads(content)
+
+                features = data.get("features", []) if isinstance(data, dict) else []
+                polygons_generated = len(features)
+
+                self._log_ml_success(
+                    "pipeline",
+                    polygons_generated=polygons_generated,
+                    output_format="geojson",
+                    **download_result,
+                    **inference_result,
+                )
+
+                return data
+
+            finally:
+                image_file.unlink(missing_ok=True)
+                output_file.unlink(missing_ok=True)
+
+        # Standard semantic segmentation pipeline
+        inference_file = temp_dir / f"{uid}.inference.tif"
+        polygon_file = temp_dir / f"{uid}.{'ndjson' if ndjson else 'json'}"
 
         try:
             inference_result = await execute_inference_pipeline(
@@ -388,7 +425,7 @@ class InferenceService:
 
                 async with aiofiles.open(polygon_file) as f:
                     if ndjson:
-                        data: str | dict[str, Any] = await f.read()
+                        data = await f.read()
                     else:
                         content = await f.read()
                         data = json.loads(content)
@@ -445,13 +482,15 @@ class InferenceService:
     ) -> dict[str, Any]:
         """Run URL-based inference with model-aware window handling."""
         uid = str(uuid.uuid4())
-        inference_result_key = f"projects/{project_id}/results/inference_{uid}.tif"
 
         bbox = params["bbox"]
         images = params["images"]
 
-        # Determine window count based on model type
         model_spec = MODEL_REGISTRY.get(params["model"])
+        is_instance_segmentation = (
+            model_spec.instance_segmentation if model_spec else False
+        )
+
         if model_spec and not model_spec.requires_window:
             win_a = images[0]
             win_b = None
@@ -464,9 +503,53 @@ class InferenceService:
                 "project_id": project_id,
                 "processing_stage": "inference_start",
                 "model_path": params["model"],
-                "resize_factor": params["resize_factor"],
+                "resize_factor": params.get("resize_factor"),
             }
         }
+
+        if is_instance_segmentation:
+            # Instance segmentation outputs GeoJSON directly
+            result_key = f"projects/{project_id}/results/inference_{uid}.geojson"
+
+            async with temp_files_context(f"{uid}.tif", f"{uid}.geojson") as (
+                temp_image_file,
+                temp_output_file,
+            ):
+                try:
+                    download_result = await download_images(
+                        temp_image_file, win_a, win_b, bbox, context
+                    )
+                    inference_result = await run_instance_segmentation(
+                        temp_image_file, temp_output_file, params, context
+                    )
+                    result = {**download_result, **inference_result}
+
+                    inference_key = await self.storage.upload(
+                        temp_output_file, result_key
+                    )
+
+                    self._log_ml_success(
+                        "inference",
+                        project_id,
+                        s3_key=inference_key,
+                        **result,
+                    )
+
+                    inference_file_url = await self.storage.get_url(inference_key)
+
+                    return {
+                        "inference_file": inference_file_url,
+                        "inference_key": inference_key,
+                        "image_file": str(temp_image_file),
+                        **result,
+                    }
+
+                except Exception as e:
+                    self._log_ml_error("inference", e, project_id)
+                    raise
+
+        # Standard semantic segmentation pipeline
+        result_key = f"projects/{project_id}/results/inference_{uid}.tif"
 
         async with temp_files_context(f"{uid}.tif", f"{uid}.inference.tif") as (
             temp_image_file,
@@ -484,7 +567,7 @@ class InferenceService:
                 )
 
                 inference_key = await self.storage.upload(
-                    temp_inference_file, inference_result_key
+                    temp_inference_file, result_key
                 )
 
                 self._log_ml_success(

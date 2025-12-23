@@ -64,6 +64,16 @@ paths:
                         version:
                           type: string
                           description: The version of the model
+                        requires_window:
+                          type: boolean
+                          description: >
+                            Whether this model requires dual time windows (two images).
+                            If false, only a single image is needed.
+                        requires_polygonize:
+                          type: boolean
+                          description: >
+                            Whether this model requires a separate polygonization step.
+                            If false, the model outputs GeoJSON directly (instance segmentation).
   /health:
     get:
       tags:
@@ -111,12 +121,14 @@ paths:
               type: object
               required:
                 - inference
-                - polygons
               properties:
                 inference:
                   $ref: '#/components/schemas/InferenceParameters'
                 polygons:
                   $ref: '#/components/schemas/PolygonizationParameters'
+                  description: >
+                    Polygonization parameters. Required for semantic segmentation models,
+                    ignored for instance segmentation models (which output GeoJSON directly).
               example:
                 inference:
                   model: 3_Class_FULL_FTW_Pretrained
@@ -485,11 +497,13 @@ components:
           oneOf:
             - type: 'null'
               description: >
-                No images provided, inference will be run on the two images uploaded to the project.
-                Errors when no impages are uploaded (or the request is synchronously executed).
+                No images provided, inference will be run on the images uploaded to the project.
+                Errors when no images are uploaded (or the request is synchronously executed).
             - type: array
-              description: A list of two publicly accessible image URLs (window A and B) to run inference on
-              minItems: 2
+              description: >
+                A list of image URLs to run inference on. Dual-window models require 2 images
+                (window A and B). Single-window and instance segmentation models require 1 image.
+              minItems: 1
               maxItems: 2
               items:
                 type: string
