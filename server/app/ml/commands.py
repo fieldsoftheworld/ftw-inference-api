@@ -54,6 +54,30 @@ def build_inference_command(
     return cmd
 
 
+def build_instance_segmentation_command(
+    image_file: Path,
+    output_file: Path,
+    params: dict[str, Any],
+) -> list[str]:
+    """Build ftw instance segmentation command (outputs GeoJSON directly)."""
+    cmd = [
+        "ftw",
+        "inference",
+        "run-instance-segmentation",
+        str(image_file.absolute()),
+        "--overwrite",
+        "--out",
+        str(output_file.absolute()),
+        "--model",
+        params["model"],
+    ]
+
+    if params.get("resize_factor") is not None:
+        cmd.extend(["--resize_factor", str(params["resize_factor"])])
+
+    return cmd
+
+
 def build_polygonize_command(
     inference_file: Path, polygon_file: Path, params: dict[str, Any]
 ) -> list[str]:
