@@ -441,7 +441,7 @@ class ProjectService:
         models = [
             {
                 "id": model_id,
-                "title": model_id.replace("_", " ").replace("-", " "),
+                "title": spec.title,
                 "description": spec.description,
                 "license": spec.license,
                 "version": spec.version,
