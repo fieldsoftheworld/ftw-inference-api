@@ -254,6 +254,7 @@ async def list_models() -> dict[str, Any]:
     models = [
         {
             "id": model_id,
+            "title": spec.title,
             "description": spec.description,
             "license": spec.license,
             "version": spec.version,
@@ -283,6 +284,7 @@ async def get_model(model_id: str) -> dict[str, Any]:
 
     return {
         "id": model_id,
+        "title": spec.title,
         "description": spec.description,
         "license": spec.license,
         "version": spec.version,
