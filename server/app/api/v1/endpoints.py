@@ -66,9 +66,7 @@ async def example(
         )
 
 
-@router.post(
-    "/projects", status_code=status.HTTP_201_CREATED
-)
+@router.post("/projects", status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_data: CreateProjectRequest,
     project_service: ProjectServiceDep,
@@ -78,9 +76,7 @@ async def create_project(
     return await project_service.create_project(project_data)
 
 
-@router.get(
-    "/projects", status_code=status.HTTP_200_OK
-)
+@router.get("/projects", status_code=status.HTTP_200_OK)
 async def get_projects(
     project_service: ProjectServiceDep,
     auth: AuthDep,
