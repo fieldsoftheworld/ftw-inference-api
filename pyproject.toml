@@ -1,9 +1,16 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["server"]
+
 [project]
 name = "ftw-inference-api"
 version = "0.1.0"
 description = "FastAPI implementation of the Fields of the World Inference API"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.11,<3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Fields of the World", email = "info@fieldsoftheworld.org"},
@@ -19,6 +26,11 @@ classifiers = [
 
 dependencies = [
     "ftw-tools[all]>=2.0.0b4",
+    "shapely>=2.0.0",
+    "pandas>=2.0.0",
+    "pyarrow>=14.0.0",
+    "numpy>=1.26.0",
+    "geopandas>=0.14.0",
     "fastapi>=0.122.0",
     "uvicorn[standard]>=0.35.0",
     "aiofiles>=23.0.0",
@@ -40,7 +52,7 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py311"
 exclude = [
     ".git",
     ".github",
@@ -76,7 +88,7 @@ line-ending = "auto"
 preview = true
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

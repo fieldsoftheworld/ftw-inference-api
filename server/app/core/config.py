@@ -18,6 +18,23 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 ENV_FILE_PATH = PROJECT_ROOT / ".env"
 
 
+def _apply_repo_dotenv() -> None:
+    """Load ftw-inference-api/.env into os.environ, overriding existing keys.
+
+    Stale ``BENCHMARK__*`` (or other) variables in the Windows user environment
+    otherwise win over the repo file when pydantic-settings merges sources.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    if ENV_FILE_PATH.is_file():
+        load_dotenv(ENV_FILE_PATH, override=True)
+
+
+_apply_repo_dotenv()
+
+
 class APIConfig(BaseModel):
     """API metadata configuration."""
 
@@ -77,6 +94,20 @@ class ProcessingConfig(BaseModel):
     max_concurrent_examples: int = 10
     example_timeout: int = 60
     gpu: int | None = None
+
+
+class BenchmarkConfig(BaseModel):
+    """FTW benchmark evaluation: local dataset root or demo mode."""
+
+    data_root: str | None = None
+    allow_demo: bool = False
+    # When True, missing country data is downloaded from Source Cooperative
+    # on first use and cached under data_root (or the built-in default below).
+    # Default True so local eval works; disable in production with BENCHMARK__AUTO_DOWNLOAD=false.
+    auto_download: bool = True
+    # Override where downloaded assets are cached.  Falls back to data_root,
+    # then to "data/ftw_cache" relative to the server working directory.
+    cache_dir: str | None = None
 
 
 class LoggingConfig(BaseModel):
@@ -159,7 +190,9 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         env_nested_delimiter="__",
-        toml_file=["config/base.toml"],
+        # base.toml is loaded only via settings_customise_sources (TomlConfigSettingsSource).
+        # A duplicate `toml_file` here caused a second TOML pass to run after env and
+        # overwrote nested values like benchmark.allow_demo from BENCHMARK__ALLOW_DEMO.
         validate_default=True,
         extra="allow",
     )
@@ -174,6 +207,7 @@ class Settings(BaseSettings):
     dynamodb: DynamoDBConfig = Field(default_factory=DynamoDBConfig)
 
     storage: StorageConfig = Field(default_factory=StorageConfig)
+    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
 
     models: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -186,11 +220,15 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Later sources override earlier ones.  Put TOML before env/dotenv so
+        # BENCHMARK__* and other env vars win over config/base.toml.
+        # Repo .env is applied into os.environ first via _apply_repo_dotenv()
+        # so it also wins over stale Windows user variables.
         return (
             init_settings,
-            env_settings,
-            dotenv_settings,
             TomlConfigSettingsSource(settings_cls),
+            dotenv_settings,
+            env_settings,
             file_secret_settings,
         )
 

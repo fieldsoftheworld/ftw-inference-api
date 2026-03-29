@@ -155,3 +155,58 @@ class CreateProjectRequest(BaseModel):
     """Request to create a new project."""
 
     title: str
+
+
+class BenchmarkRunRequest(BaseModel):
+    """Start an FTW benchmark run against dataset chips (official models only)."""
+
+    model_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        description="One or more model ids from GET /v1/models",
+    )
+    country_ids: list[str] = Field(
+        ...,
+        min_length=1,
+        description="FTW benchmark country ids from GET /v1/benchmarks/countries",
+    )
+    split: Literal["train", "validation", "val", "test"] = Field(
+        default="test",
+        description="Chip split to evaluate (default test)",
+    )
+    max_chips: int = Field(
+        default=10,
+        ge=1,
+        le=500,
+        description="Maximum chips per country per model (cost guard)",
+    )
+    seed: int | None = Field(default=None, description="Random seed for chip subsample")
+    iou_threshold: float = Field(
+        default=0.25,
+        ge=0.1,
+        le=0.99,
+        description=(
+            "IoU threshold for greedy pred↔GT instance matching. "
+            "Auto-downloaded STAC is not the benchmark’s original paired imagery, "
+            "so overlaps are often below 0.5; 0.25 is a practical default. "
+            "Use ~0.5 when evaluating the full local FTW release."
+        ),
+    )
+    include_map_geojson: bool = Field(
+        default=True,
+        description=(
+            "If true, the result may include map_geojson (chip footprints plus GT and "
+            "prediction polygons) when max_chips is at most 40. Omit or set false to "
+            "reduce response size."
+        ),
+    )
+
+    @field_validator("model_ids")
+    @classmethod
+    def validate_models(cls, v: list[str]) -> list[str]:
+        for mid in v:
+            if mid not in MODEL_REGISTRY:
+                raise ValueError(
+                    f"Unknown model '{mid}'. Use GET /v1/models for valid ids."
+                )
+        return v

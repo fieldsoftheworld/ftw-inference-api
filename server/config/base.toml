@@ -51,6 +51,13 @@ backend = "source_coop" # "local" or "source_coop"
 output_dir = "data/results"
 max_file_size_mb = 1000
 
+[benchmark]
+# Local path to extracted Fields of The World dataset root (contains country folders).
+# data_root = "/path/to/fields-of-the-world"
+allow_demo = false
+# false in production if you mount data only; true uses Source Cooperative cache (see BENCHMARK__* env).
+auto_download = true
+
 [storage.source_coop]
 # Source Coop S3-compatible storage settings
 bucket_name = "ftw"

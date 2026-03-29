@@ -4,7 +4,9 @@ from fastapi import APIRouter, File, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from ftw_tools.inference.model_registry import MODEL_REGISTRY
 
+from app.benchmark.manifest import load_country_manifest
 from app.schemas.requests import (
+    BenchmarkRunRequest,
     CreateProjectRequest,
     ExampleWorkflowRequest,
     InferenceRequest,
@@ -12,6 +14,8 @@ from app.schemas.requests import (
     SceneSelectionRequest,
 )
 from app.schemas.responses import (
+    BenchmarkCountriesResponse,
+    BenchmarkCountryInfo,
     HealthResponse,
     ProjectResponse,
     ProjectsResponse,
@@ -314,3 +318,50 @@ async def get_model(model_id: str) -> dict[str, Any]:
 async def health_check() -> HealthResponse:
     """Check API health status."""
     return HealthResponse(status="healthy")
+
+
+@router.get(
+    "/benchmarks/countries",
+    response_model=BenchmarkCountriesResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def list_benchmark_countries() -> BenchmarkCountriesResponse:
+    """List FTW benchmark countries (same role as the model catalog for the UI)."""
+    rows = load_country_manifest()
+    countries = [BenchmarkCountryInfo(**r) for r in rows]
+    return BenchmarkCountriesResponse(countries=countries, total=len(countries))
+
+
+@router.post(
+    "/benchmarks/runs",
+    response_model=TaskSubmissionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_benchmark_run(
+    body: BenchmarkRunRequest,
+    task_service: TaskServiceDep,
+    auth: AuthDep,
+) -> TaskSubmissionResponse:
+    """Queue an FTW benchmark evaluation job."""
+    task_id = await task_service.submit_benchmark_task(body.model_dump())
+    return TaskSubmissionResponse(
+        message="Benchmark evaluation queued",
+        task_id=task_id,
+        project_id="benchmark",
+        status="queued",
+    )
+
+
+@router.get(
+    "/benchmarks/runs/{task_id}",
+    response_model=TaskDetailsResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_benchmark_run(
+    task_id: str,
+    task_service: TaskServiceDep,
+    auth: AuthDep,
+) -> TaskDetailsResponse:
+    """Poll benchmark task status and results (same shape as project task details)."""
+    task_details = await task_service.get_task_details("benchmark", task_id)
+    return TaskDetailsResponse(**task_details)

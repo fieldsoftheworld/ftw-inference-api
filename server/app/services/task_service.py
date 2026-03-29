@@ -32,6 +32,14 @@ class TaskService:
         }
         return await self.queue.submit(TaskType.POLYGONIZE, payload)
 
+    async def submit_benchmark_task(self, benchmark_params: dict[str, Any]) -> str:
+        """Submit an FTW benchmark evaluation job."""
+        payload = {
+            "project_id": "benchmark",
+            "benchmark_params": benchmark_params,
+        }
+        return await self.queue.submit(TaskType.BENCHMARK, payload)
+
     # --- Public API: Task Retrieval ---
 
     async def get_task_status(self, task_id: str) -> TaskStatus:

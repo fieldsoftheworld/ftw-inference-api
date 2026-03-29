@@ -117,3 +117,23 @@ class HealthResponse(BaseModel):
     """Health check response."""
 
     status: Literal["healthy"]
+
+
+class BenchmarkCountryInfo(BaseModel):
+    """One FTW benchmark (country) from the Source Cooperative FTW product."""
+
+    id: str
+    title: str
+    year: int
+    chips: int
+    train: int
+    validation: int
+    test: int
+    license: str
+
+
+class BenchmarkCountriesResponse(BaseModel):
+    """Catalog of benchmark countries for the picker UI."""
+
+    countries: list[BenchmarkCountryInfo]
+    total: int

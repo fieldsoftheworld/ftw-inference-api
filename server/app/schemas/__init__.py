@@ -1,11 +1,14 @@
 from .parameters import ModelInfo, ProjectResultLinks, TaskInfo
 from .requests import (
+    BenchmarkRunRequest,
     CreateProjectRequest,
     ExampleWorkflowRequest,
     InferenceRequest,
     PolygonizationRequest,
 )
 from .responses import (
+    BenchmarkCountriesResponse,
+    BenchmarkCountryInfo,
     ErrorResponse,
     HealthResponse,
     ProjectResponse,
@@ -17,6 +20,9 @@ from .responses import (
 )
 
 __all__ = [
+    "BenchmarkCountriesResponse",
+    "BenchmarkCountryInfo",
+    "BenchmarkRunRequest",
     "CreateProjectRequest",
     "ErrorResponse",
     "ExampleWorkflowRequest",
