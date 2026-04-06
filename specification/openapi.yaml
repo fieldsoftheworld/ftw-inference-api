@@ -443,6 +443,123 @@ paths:
           $ref: '#/components/responses/4XX'
         5XX:
           $ref: '#/components/responses/5XX'
+
+  # ===========================================================================
+  # Feedback & Contribution Endpoints (unauthenticated — no bearer token)
+  # ===========================================================================
+  /feedback/tile-rating:
+    post:
+      tags:
+        - Feedback
+      summary: Submit a tile quality rating
+      operationId: submitTileRating
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TileRatingRequest'
+      responses:
+        '200':
+          description: Rating submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TileRatingResponse'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
+  /feedback/tell-us-more:
+    post:
+      tags:
+        - Feedback
+      summary: Submit detailed feedback
+      operationId: submitDetailedFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TellUsMoreRequest'
+      responses:
+        '200':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TellUsMoreResponse'
+        403:
+          $ref: '#/components/responses/CaptchaFailed'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
+  /feedback/contribute:
+    post:
+      tags:
+        - Feedback
+      summary: Submit a contribution interest form
+      operationId: submitContribution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributeRequest'
+      responses:
+        '200':
+          description: Contribution form submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributeResponse'
+        403:
+          $ref: '#/components/responses/CaptchaFailed'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
+  /feedback/tile-summary/{tile_id}:
+    get:
+      tags:
+        - Feedback
+      summary: Get aggregated ratings for a tile
+      operationId: getTileSummary
+      parameters:
+        - name: tile_id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '200':
+          description: Tile rating summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TileSummaryResponse'
+        '404':
+          description: No ratings found for this tile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
 components:
   parameters:
     project_id:
@@ -468,6 +585,18 @@ components:
             $ref: '#/components/schemas/Error'
     5XX:
       description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    429:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    CaptchaFailed:
+      description: Captcha verification failed
       content:
         application/json:
           schema:
@@ -764,6 +893,207 @@ components:
           type: string
           nullable: true
           description: Error message if task failed
+
+    # =========================================================================
+    # Feedback & Contribution Schemas
+    # =========================================================================
+    TileRatingRequest:
+      type: object
+      required:
+        - tile_id
+        - rating
+        - session_id
+      properties:
+        tile_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+        rating:
+          type: integer
+          enum: [1, 2, 3]
+          description: "1: Not Great, 2: Ok, 3: Great!"
+        session_id:
+          type: string
+          format: uuid
+        map_center_lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        map_center_lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        map_zoom:
+          type: integer
+          minimum: 0
+          maximum: 22
+
+    TileRatingResponse:
+      type: object
+      required:
+        - rating_id
+        - status
+      properties:
+        rating_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [created, updated]
+
+    TellUsMoreRequest:
+      type: object
+      required:
+        - tile_id
+        - quality_feedback
+        - use_case
+        - session_id
+        - captcha_token
+      properties:
+        tile_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+        rating:
+          type: integer
+          enum: [1, 2, 3]
+        quality_feedback:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        use_case:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        name:
+          type: string
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        organization:
+          type: string
+          maxLength: 200
+        session_id:
+          type: string
+          format: uuid
+        map_center_lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        map_center_lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        map_zoom:
+          type: integer
+          minimum: 0
+          maximum: 22
+        captcha_token:
+          type: string
+          minLength: 1
+
+    TellUsMoreResponse:
+      type: object
+      required:
+        - feedback_id
+        - status
+      properties:
+        feedback_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted]
+
+    ContributeRequest:
+      type: object
+      required:
+        - contribution_types
+        - name
+        - email
+        - session_id
+        - captcha_token
+      properties:
+        contribution_types:
+          type: array
+          items:
+            type: string
+            enum:
+              - annotator
+              - share_data
+              - provide_models
+              - contribute_code
+          minItems: 1
+          uniqueItems: true
+        resource_link:
+          type: string
+          maxLength: 1000
+        additional_info:
+          type: string
+          maxLength: 5000
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        organization:
+          type: string
+          maxLength: 200
+        session_id:
+          type: string
+          format: uuid
+        captcha_token:
+          type: string
+          minLength: 1
+
+    ContributeResponse:
+      type: object
+      required:
+        - contribution_id
+        - status
+      properties:
+        contribution_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted]
+
+    TileSummaryResponse:
+      type: object
+      required:
+        - tile_id
+        - total_ratings
+        - average_rating
+        - rating_distribution
+      properties:
+        tile_id:
+          type: string
+        total_ratings:
+          type: integer
+          minimum: 0
+        average_rating:
+          type: number
+          minimum: 1
+          maximum: 3
+        rating_distribution:
+          type: object
+          properties:
+            "1":
+              type: integer
+              minimum: 0
+            "2":
+              type: integer
+              minimum: 0
+            "3":
+              type: integer
+              minimum: 0
+
   securitySchemes:
     bearer:
       description: Bearer token
