@@ -1,10 +1,11 @@
 from typing import Annotated, cast
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Query, Request, status
 
 from app.core.auth import verify_auth
 from app.core.queue import QueueBackend
 from app.core.storage import StorageBackend
+from app.ml.validation import validate_bbox
 from app.services.inference_service import InferenceService
 from app.services.project_service import ProjectService
 from app.services.task_service import TaskService
@@ -50,3 +51,30 @@ InferenceServiceDep = Annotated[
 ]
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
 TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]
+
+
+def parse_bbox_query(
+    bbox: Annotated[
+        str,
+        Query(
+            description=(
+                "WGS84 bounding box as a comma-separated string in the order "
+                "minLng,minLat,maxLng,maxLat (e.g. 12.0,48.0,13.0,49.0)"
+            ),
+            pattern=r"^-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?$",
+        ),
+    ],
+) -> list[float]:
+    """Parse and validate a bbox query parameter into a list of four floats."""
+    values = [float(x) for x in bbox.split(",")]
+    try:
+        validate_bbox(values)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    return values
+
+
+BBoxQueryDep = Annotated[list[float], Depends(parse_bbox_query)]
