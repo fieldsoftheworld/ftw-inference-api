@@ -30,6 +30,7 @@ class TaskStatus(Enum):
 class TaskType(Enum):
     INFERENCE = "inference"
     POLYGONIZE = "polygonize"
+    BENCHMARK = "benchmark"
 
 
 class ProjectStatus(str, Enum):

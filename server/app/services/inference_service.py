@@ -107,6 +107,71 @@ class InferenceService:
                 detail="An internal error occurred during scene selection",
             ) from e
 
+    async def try_scene_selection_stac(
+        self,
+        bbox: list[float],
+        year: int,
+        *,
+        cloud_cover_max: int = 20,
+        buffer_days: int = 14,
+        s2_collection: str = "c1",
+    ) -> dict[str, str] | None:
+        """Resolve Sentinel-2 STAC item URLs via ``ftw inference scene-selection``.
+
+        Used by the benchmark pipeline when chip parquet / data_config have no STAC
+        URLs (e.g. Source Cooperative boundaries-only exports). Returns ``None`` on
+        failure instead of raising HTTP errors.
+
+        Tries Microsoft Planetary Computer first, then Earth Search — some networks
+        return 403 from one STAC endpoint but not the other.
+        """
+        params = prepare_scene_selection_params(
+            {
+                "bbox": bbox,
+                "year": year,
+                "cloud_cover_max": cloud_cover_max,
+                "buffer_days": buffer_days,
+            }
+        )
+        for stac_host in ("mspc", "earthsearch"):
+            try:
+                async with temp_files_context("bench_scene_selection.json") as (
+                    temp_output,
+                ):
+                    cmd = build_scene_selection_command(
+                        year=params["year"],
+                        bbox=params["bbox"],
+                        out=str(temp_output),
+                        cloud_cover_max=params.get("cloud_cover_max", 20),
+                        buffer_days=params.get("buffer_days", 14),
+                        stac_host=stac_host,
+                        s2_collection=s2_collection,
+                    )
+                    result = await run_async(cmd)
+                    if result.returncode != 0:
+                        logger.warning(
+                            "Benchmark scene-selection failed",
+                            extra={
+                                "stac_host": stac_host,
+                                "stderr": (result.stderr or "")[:2000],
+                            },
+                        )
+                        continue
+                    async with aiofiles.open(temp_output) as f:
+                        content = await f.read()
+                    scene_data = json.loads(content)
+                wa = (scene_data.get("window_a") or "").strip()
+                wb = (scene_data.get("window_b") or "").strip()
+                if wa:
+                    return {"window_a": wa, "window_b": wb}
+            except Exception as e:
+                logger.warning(
+                    "Benchmark scene-selection error",
+                    extra={"stac_host": stac_host, "error": str(e)},
+                )
+                continue
+        return None
+
     async def run_example_workflow(
         self,
         params: dict[str, Any],

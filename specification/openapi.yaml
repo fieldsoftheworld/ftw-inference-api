@@ -443,6 +443,71 @@ paths:
           $ref: '#/components/responses/4XX'
         5XX:
           $ref: '#/components/responses/5XX'
+  /benchmarks/countries:
+    get:
+      tags:
+        - Benchmarks
+      summary: List FTW benchmark countries
+      operationId: listBenchmarkCountries
+      description: |-
+        Returns the Fields of The World country catalog (chip counts, splits, licenses)
+        for populating the benchmark picker alongside models.
+      responses:
+        '200':
+          description: Benchmark country catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchmarkCountries'
+  /benchmarks/runs:
+    post:
+      tags:
+        - Benchmarks
+      summary: Queue FTW benchmark evaluation
+      operationId: createBenchmarkRun
+      description: |-
+        Queues evaluation of official models on FTW benchmark chips. Requires
+        `benchmark.data_root` on the server (or `allow_demo` for synthetic scores).
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BenchmarkRunRequest'
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSubmission'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
+  /benchmarks/runs/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/task_id'
+    get:
+      tags:
+        - Benchmarks
+      summary: Get benchmark run status and results
+      operationId: getBenchmarkRun
+      security:
+        - bearer: []
+      responses:
+        '200':
+          description: Task details including aggregated scores in result when completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskDetails'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        5XX:
+          $ref: '#/components/responses/5XX'
 components:
   parameters:
     project_id:
@@ -473,6 +538,85 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    BenchmarkCountry:
+      type: object
+      required:
+        - id
+        - title
+        - year
+        - chips
+        - train
+        - validation
+        - test
+        - license
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        year:
+          type: integer
+        chips:
+          type: integer
+        train:
+          type: integer
+        validation:
+          type: integer
+        test:
+          type: integer
+        license:
+          type: string
+    BenchmarkCountries:
+      type: object
+      required:
+        - countries
+        - total
+      properties:
+        countries:
+          type: array
+          items:
+            $ref: '#/components/schemas/BenchmarkCountry'
+        total:
+          type: integer
+    BenchmarkRunRequest:
+      type: object
+      required:
+        - model_ids
+        - country_ids
+      properties:
+        model_ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        country_ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        split:
+          type: string
+          enum: [train, validation, val, test]
+          default: test
+        max_chips:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 10
+        seed:
+          type: integer
+          nullable: true
+        iou_threshold:
+          type: number
+          minimum: 0.1
+          maximum: 0.99
+          default: 0.25
+        include_map_geojson:
+          type: boolean
+          default: true
+          description: >
+            When true, responses may include map_geojson (footprints, ground truth, and
+            prediction polygons) for map display if max_chips is at most 40.
     InferenceParameters:
       type: object
       required:
@@ -694,7 +838,7 @@ components:
           description: Unique task identifier
         task_type:
           type: string
-          enum: [inference, polygonize]
+          enum: [inference, polygonize, benchmark]
           description: Type of task
         status:
           type: string
