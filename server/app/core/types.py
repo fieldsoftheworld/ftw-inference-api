@@ -1,5 +1,5 @@
 import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import pendulum
@@ -32,7 +32,7 @@ class TaskType(Enum):
     POLYGONIZE = "polygonize"
 
 
-class ProjectStatus(str, Enum):
+class ProjectStatus(StrEnum):
     CREATED = "created"
     QUEUED = "queued"
     RUNNING = "running"

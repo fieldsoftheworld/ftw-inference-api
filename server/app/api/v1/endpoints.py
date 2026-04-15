@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Header, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
@@ -32,7 +32,7 @@ from .dependencies import (
 router = APIRouter()
 
 
-@router.get("/", response_model=RootResponse, status_code=status.HTTP_200_OK)
+@router.get("/", status_code=status.HTTP_200_OK)
 async def get_root(project_service: ProjectServiceDep) -> Any:
     """Get API configuration and available endpoints."""
     return project_service.get_api_configuration()
@@ -43,7 +43,7 @@ async def example(
     params: ExampleWorkflowRequest,
     inference_service: InferenceServiceDep,
     auth: AuthDep,
-    accept: str | None = Header(None),
+    accept: Annotated[str | None, Header()] = None,
 ) -> PlainTextResponse | JSONResponse:
     """Run example workflow with inference and polygonization."""
     response = await inference_service.run_example_workflow(
@@ -66,9 +66,7 @@ async def example(
         )
 
 
-@router.post(
-    "/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/projects", status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_data: CreateProjectRequest,
     project_service: ProjectServiceDep,
@@ -78,9 +76,7 @@ async def create_project(
     return await project_service.create_project(project_data)
 
 
-@router.get(
-    "/projects", response_model=ProjectsResponse, status_code=status.HTTP_200_OK
-)
+@router.get("/projects", status_code=status.HTTP_200_OK)
 async def get_projects(
     project_service: ProjectServiceDep,
     auth: AuthDep,
@@ -92,7 +88,6 @@ async def get_projects(
 
 @router.get(
     "/projects/{project_id}",
-    response_model=ProjectResponse,
     status_code=status.HTTP_200_OK,
 )
 async def get_project(
@@ -122,7 +117,7 @@ async def upload_image(
     window: str,
     project_service: ProjectServiceDep,
     auth: AuthDep,
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
 ) -> None:
     """Upload satellite image for a specific project window."""
     await project_service.upload_image(project_id, window, file)
@@ -130,7 +125,6 @@ async def upload_image(
 
 @router.put(
     "/projects/{project_id}/inference",
-    response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def inference(
@@ -153,7 +147,6 @@ async def inference(
 
 @router.put(
     "/projects/{project_id}/polygons",
-    response_model=TaskSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def polygonize(
@@ -204,7 +197,6 @@ async def get_inference_results(
 
 @router.get(
     "/projects/{project_id}/status",
-    response_model=ProjectStatusResponse,
     status_code=status.HTTP_200_OK,
 )
 async def get_project_status(
@@ -219,7 +211,6 @@ async def get_project_status(
 
 @router.get(
     "/projects/{project_id}/tasks/{task_id}",
-    response_model=TaskDetailsResponse,
     status_code=status.HTTP_200_OK,
 )
 async def get_task_status(
@@ -235,7 +226,6 @@ async def get_task_status(
 
 @router.post(
     "/scene-selection",
-    response_model=SceneSelectionResponse,
     status_code=status.HTTP_200_OK,
 )
 async def scene_selection(
@@ -310,7 +300,7 @@ async def get_model(model_id: str) -> dict[str, Any]:
     }
 
 
-@router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
+@router.get("/health", status_code=status.HTTP_200_OK)
 async def health_check() -> HealthResponse:
     """Check API health status."""
     return HealthResponse(status="healthy")

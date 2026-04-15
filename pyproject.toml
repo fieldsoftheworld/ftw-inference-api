@@ -18,20 +18,39 @@ classifiers = [
 ]
 
 dependencies = [
-    "ftw-tools[all]>=2.0.0b4",
-    "fastapi>=0.122.0",
-    "uvicorn[standard]>=0.35.0",
+    "ftw-tools[all]==2.0.0b5",
+    "fastapi>=0.135.2",
+    "uvicorn[standard]>=0.42.0",
     "aiofiles>=23.0.0",
     "aioboto3>=15.5.0",
     "pydantic>=2.12.4",
-    "pydantic-settings>=2.12.0",
-    "pendulum>=3.0.0",
+    "pydantic-settings>=2.13.1",
+    "pendulum>=3.2.0",
     "pynamodb>=6.1.0,<7",
     "python-jose[cryptography]>=3.3.0",
-    "python-multipart>=0.0.6",
+    "python-multipart>=0.0.22",
     "requests>=2.28.0",
     "pyyaml>=6.0",
     "watchtower>=3.4.0",
+]
+
+[dependency-groups]
+dev = [
+    # Testing
+    "pytest>=8.4.2",
+    "pytest-cov>=7.1.0",
+    "pytest-asyncio>=0.26.0",
+    "pytest-aioboto3>=0.2.0",
+    "httpx>=0.24.0",
+    "moto>=5.1.22,<6",
+    # Linting & Type checking
+    "ruff>=0.15.7",
+    "mypy>=1.0",
+    "types-requests>=2.32.4.20260324",
+    "types-pyyaml>=6.0.12.11",
+    "types-aiofiles>=24.1.0",
+    "types-python-jose>=3.5.0.20250531",
+    "types-aioboto3>=15.5.0",
 ]
 
 [tool.pytest.ini_options]
@@ -64,6 +83,7 @@ select = [
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
     "RUF", # Ruff-specific rules
+    "FAST", # FastAPI-specific rules
 ]
 ignore = [
     "B008",  # Needed for FastAPI DI `Depends()`
@@ -109,22 +129,3 @@ exclude_lines = [
 [tool.coverage.xml]
 output = "coverage.xml"
 
-# UV dependency groups (PEP 735)
-[dependency-groups]
-dev = [
-    # Testing
-    "pytest>=8.4.1",
-    "pytest-cov>=6.2.1",
-    "pytest-asyncio>=0.26.0",
-    "pytest-aioboto3>=0.2.0",
-    "httpx>=0.24.0",
-    "moto>=5.1.9,<6",
-    # Linting & Type checking
-    "ruff>=0.14.6",
-    "mypy>=1.0",
-    "types-requests>=2.31.0",
-    "types-pyyaml>=6.0.12.11",
-    "types-aiofiles>=24.1.0",
-    "types-python-jose>=3.5.0.20250531",
-    "types-aioboto3>=15.5.0",
-]
