@@ -443,6 +443,189 @@ paths:
           $ref: '#/components/responses/4XX'
         5XX:
           $ref: '#/components/responses/5XX'
+
+  # ===========================================================================
+  # Feedback & Contribution Endpoints
+  #
+  # Used by the public web app to collect user feedback on field boundary
+  # quality and to capture community contribution interest. All endpoints
+  # use Bearer authentication consistent with the rest of the API; for the
+  # public viewer, a guest token is used.
+  #
+  # Spam protection: IP-based rate limiting (see per-endpoint limits below).
+  # ===========================================================================
+  /feedback/tile-rating:
+    post:
+      tags:
+        - Feedback
+      summary: Submit a viewport quality rating
+      operationId: submitTileRating
+      description: |-
+        Submit a 1-3 quality rating for the field boundaries currently
+        visible in the user's viewport. This must remain a single-click
+        interaction and must not block on captcha or other friction.
+
+        **Location:** Identified by the WGS84 viewport bbox plus zoom level.
+        The bbox describes what the user could see when rating; the zoom
+        level indicates how closely they were inspecting the data.
+
+        **Deduplication:** If the same client (by IP) submits multiple
+        ratings for substantially the same bbox + zoom within a short
+        window, the server SHOULD treat the latest as an update rather
+        than creating a new record. Implementations are free to choose
+        the dedup strategy.
+
+        **Rate limit:** 30 requests per minute per IP.
+
+
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TileRatingRequest'
+      responses:
+        '200':
+          description: Rating submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TileRatingResponse'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
+  /feedback/tell-us-more:
+    post:
+      tags:
+        - Feedback
+      summary: Submit detailed feedback
+      operationId: submitDetailedFeedback
+      description: |-
+        Submit detailed feedback about field boundary quality, typically
+        accessed via a "Tell Us More" button after a quick rating.
+
+        **Location:** Identified by the WGS84 viewport bbox plus zoom level,
+        same as the tile-rating endpoint.
+
+        **Email notification:** Each successful submission triggers an email
+        notification to project maintainers via the server's configured
+        notification mechanism (e.g., AWS SNS).
+
+        **Rate limit:** 5 requests per minute per IP.
+
+
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TellUsMoreRequest'
+      responses:
+        '200':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TellUsMoreResponse'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
+  /feedback/contribute:
+    post:
+      tags:
+        - Feedback
+      summary: Submit a contribution interest form
+      operationId: submitContribution
+      description: |-
+        Capture interest from community members who want to contribute to
+        FTW as annotators, data providers, model developers, or code
+        contributors.
+
+        **Email notification:** Each successful submission triggers an email
+        notification to project maintainers via the server's configured
+        notification mechanism (e.g., AWS SNS).
+
+        **Rate limit:** 5 requests per minute per IP.
+
+
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributeRequest'
+      responses:
+        '200':
+          description: Contribution form submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributeResponse'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
+  /feedback/area-summary:
+    get:
+      tags:
+        - Feedback
+      summary: Get aggregated ratings for an area
+      operationId: getAreaSummary
+      description: |-
+        Returns aggregate rating statistics for all ratings whose viewport
+        bbox intersects the requested bbox. Used by the frontend to indicate
+        regions where users have provided feedback.
+
+        **Rate limit:** 60 requests per minute per IP.
+      security:
+        - bearer: []
+      parameters:
+        - name: bbox
+          in: query
+          required: true
+          description: |-
+            WGS84 bounding box as a comma-separated string in the order
+            `minLng,minLat,maxLng,maxLat` (e.g. `12.0,48.0,13.0,49.0`).
+          schema:
+            type: string
+            pattern: '^-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?$'
+      responses:
+        '200':
+          description: Area rating summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AreaSummaryResponse'
+        '404':
+          description: No ratings found in this area
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        4XX:
+          $ref: '#/components/responses/4XX'
+        429:
+          $ref: '#/components/responses/429'
+        5XX:
+          $ref: '#/components/responses/5XX'
+
 components:
   parameters:
     project_id:
@@ -468,6 +651,12 @@ components:
             $ref: '#/components/schemas/Error'
     5XX:
       description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    429:
+      description: Rate limit exceeded
       content:
         application/json:
           schema:
@@ -764,6 +953,222 @@ components:
           type: string
           nullable: true
           description: Error message if task failed
+
+    # =========================================================================
+    # Feedback & Contribution Schemas
+    # =========================================================================
+    Bbox:
+      type: array
+      description: |-
+        WGS84 bounding box in the order [minLng, minLat, maxLng, maxLat].
+        Coordinates are in EPSG:4326 decimal degrees.
+      items:
+        type: number
+      minItems: 4
+      maxItems: 4
+      example: [12.0, 48.0, 13.0, 49.0]
+
+    TileRatingRequest:
+      type: object
+      required:
+        - rating
+        - bbox
+        - zoom
+      properties:
+        rating:
+          type: integer
+          enum: [1, 2, 3]
+          description: "1: Not Great, 2: Ok, 3: Great!"
+        bbox:
+          $ref: '#/components/schemas/Bbox'
+        zoom:
+          type: integer
+          minimum: 0
+          maximum: 22
+          description: |-
+            Map zoom level at the time of the rating. Indicates how closely
+            the user was inspecting the data when forming their opinion.
+
+    TileRatingResponse:
+      type: object
+      required:
+        - rating_id
+        - status
+      properties:
+        rating_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [created, updated]
+          description: |-
+            `created` if a new record was stored, `updated` if the server
+            applied dedup logic and updated an existing record.
+
+    TellUsMoreRequest:
+      type: object
+      required:
+        - quality_feedback
+        - use_case
+        - bbox
+        - zoom
+      properties:
+        rating:
+          type: integer
+          enum: [1, 2, 3]
+          description: |-
+            Optional rating carried over from the tile-rating form if the
+            user rated before clicking "Tell Us More".
+        quality_feedback:
+          type: string
+          minLength: 1
+          maxLength: 5000
+          description: |-
+            Required. Response to: "What was good/bad? How must the field
+            boundaries improve to be useful to you?"
+        use_case:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: |-
+            Required. Response to: "How would you like to use field
+            boundaries? Tell us about your use case."
+        name:
+          type: string
+          maxLength: 200
+          description: Optional submitter name.
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Optional submitter email.
+        organization:
+          type: string
+          maxLength: 200
+          description: Optional submitter organization.
+        bbox:
+          $ref: '#/components/schemas/Bbox'
+        zoom:
+          type: integer
+          minimum: 0
+          maximum: 22
+          description: |-
+            Map zoom level at the time of the feedback submission.
+
+    TellUsMoreResponse:
+      type: object
+      required:
+        - feedback_id
+        - status
+      properties:
+        feedback_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted]
+
+    ContributeRequest:
+      type: object
+      required:
+        - contribution_types
+        - name
+        - email
+      properties:
+        contribution_types:
+          type: array
+          items:
+            type: string
+            enum:
+              - annotator
+              - share_data
+              - provide_models
+              - contribute_code
+            description: |-
+              Type of contribution the user is interested in:
+              - `annotator`: Help label/annotate field boundaries
+              - `share_data`: Share existing field boundary datasets
+              - `provide_models`: Contribute trained ML models
+              - `contribute_code`: Contribute to FTW software repositories
+          minItems: 1
+          uniqueItems: true
+          description: |-
+            One or more checkbox values from the contribute form indicating
+            how the user would like to participate.
+        resource_link:
+          type: string
+          format: uri
+          maxLength: 1000
+          description: |-
+            Optional link to a resource the user wants to share — for
+            example, a dataset URL or model repository.
+        additional_info:
+          type: string
+          maxLength: 5000
+          description: |-
+            Optional free text. Response to: "Anything else you would like
+            us to know?"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Required submitter name.
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Required submitter email.
+        organization:
+          type: string
+          maxLength: 200
+          description: Optional submitter organization.
+
+    ContributeResponse:
+      type: object
+      required:
+        - contribution_id
+        - status
+      properties:
+        contribution_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted]
+
+    AreaSummaryResponse:
+      type: object
+      required:
+        - bbox
+        - total_ratings
+        - average_rating
+        - rating_distribution
+      properties:
+        bbox:
+          $ref: '#/components/schemas/Bbox'
+        total_ratings:
+          type: integer
+          minimum: 0
+          description: Total number of ratings whose viewport intersects this bbox.
+        average_rating:
+          type: number
+          minimum: 1
+          maximum: 3
+          description: Average rating across all matching submissions.
+        rating_distribution:
+          type: object
+          description: Count of ratings for each value (1, 2, 3).
+          properties:
+            "1":
+              type: integer
+              minimum: 0
+            "2":
+              type: integer
+              minimum: 0
+            "3":
+              type: integer
+              minimum: 0
+
   securitySchemes:
     bearer:
       description: Bearer token
