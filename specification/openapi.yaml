@@ -465,19 +465,17 @@ paths:
         visible in the user's viewport. This must remain a single-click
         interaction and must not block on captcha or other friction.
 
-        **Location:** Identified by the WGS84 viewport bbox plus zoom level.
-        The bbox describes what the user could see when rating; the zoom
-        level indicates how closely they were inspecting the data.
+        **Location:** Identified by the WGS84 viewport bbox plus pixel resolution in meters.
+        The bbox describes what the user could see when rating; the resolution
+        indicates how closely they were inspecting the data.
 
         **Deduplication:** If the same client (by IP) submits multiple
-        ratings for substantially the same bbox + zoom within a short
+        ratings for substantially the same bbox + resolution within a short
         window, the server SHOULD treat the latest as an update rather
         than creating a new record. Implementations are free to choose
         the dedup strategy.
 
         **Rate limit:** 30 requests per minute per IP.
-
-
       security:
         - bearer: []
       requestBody:
@@ -510,7 +508,7 @@ paths:
         Submit detailed feedback about field boundary quality, typically
         accessed via a "Tell Us More" button after a quick rating.
 
-        **Location:** Identified by the WGS84 viewport bbox plus zoom level,
+        **Location:** Identified by the WGS84 viewport bbox plus pixel resolution in meters,
         same as the tile-rating endpoint.
 
         **Email notification:** Each successful submission triggers an email
@@ -518,8 +516,6 @@ paths:
         notification mechanism (e.g., AWS SNS).
 
         **Rate limit:** 5 requests per minute per IP.
-
-
       security:
         - bearer: []
       requestBody:
@@ -558,8 +554,6 @@ paths:
         notification mechanism (e.g., AWS SNS).
 
         **Rate limit:** 5 requests per minute per IP.
-
-
       security:
         - bearer: []
       requestBody:
@@ -973,7 +967,7 @@ components:
       required:
         - rating
         - bbox
-        - zoom
+        - resolution
       properties:
         rating:
           type: integer
@@ -981,12 +975,11 @@ components:
           description: "1: Not Great, 2: Ok, 3: Great!"
         bbox:
           $ref: '#/components/schemas/Bbox'
-        zoom:
-          type: integer
+        resolution:
+          type: number
           minimum: 0
-          maximum: 22
           description: |-
-            Map zoom level at the time of the rating. Indicates how closely
+            Pixel resolution in meters at the time of the rating. Indicates how closely
             the user was inspecting the data when forming their opinion.
 
     TileRatingResponse:
@@ -1011,7 +1004,7 @@ components:
         - quality_feedback
         - use_case
         - bbox
-        - zoom
+        - resolution
       properties:
         rating:
           type: integer
@@ -1048,13 +1041,12 @@ components:
           description: Optional submitter organization.
         bbox:
           $ref: '#/components/schemas/Bbox'
-        zoom:
-          type: integer
+        resolution:
+          type: number
           minimum: 0
-          maximum: 22
           description: |-
-            Map zoom level at the time of the feedback submission.
-
+            Pixel resolution in meters at the time of the feedback submission.
+            Indicates how closely the user was inspecting the data when forming their opinion.
     TellUsMoreResponse:
       type: object
       required:
@@ -1095,19 +1087,17 @@ components:
           description: |-
             One or more checkbox values from the contribute form indicating
             how the user would like to participate.
-        resource_link:
+        resources:
           type: string
-          format: uri
-          maxLength: 1000
+          maxLength: 5000
           description: |-
-            Optional link to a resource the user wants to share — for
-            example, a dataset URL or model repository.
+            Resources (field boundaries, models, etc.) the user wants to share — for
+            example, a dataset URL or model repository with a description.
         additional_info:
           type: string
           maxLength: 5000
           description: |-
-            Optional free text. Response to: "Anything else you would like
-            us to know?"
+            Any additional information the user wants to provide about their contribution interest.
         name:
           type: string
           minLength: 1
@@ -1156,18 +1146,19 @@ components:
           maximum: 3
           description: Average rating across all matching submissions.
         rating_distribution:
-          type: object
+          type: array
           description: Count of ratings for each value (1, 2, 3).
-          properties:
-            "1":
-              type: integer
-              minimum: 0
-            "2":
-              type: integer
-              minimum: 0
-            "3":
-              type: integer
-              minimum: 0
+          minItems: 3
+          maxItems: 3
+          items:
+            type: object
+            properties:
+              level:
+                type: integer
+                enum: [1, 2, 3]
+              count:
+                type: integer
+                minimum: 0
 
   securitySchemes:
     bearer:
