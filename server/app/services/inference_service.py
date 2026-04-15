@@ -1,7 +1,6 @@
 import json
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -335,45 +334,50 @@ class InferenceService:
     ) -> str | dict[str, Any]:
         """Run ML pipeline for example workflow with conditional polygonization."""
         uid = str(uuid.uuid4())
-        temp_dir = Path("data/temp")
-        image_file = temp_dir / f"{uid}.tif"
+        ext = "ndjson" if ndjson else "json"
 
-        bbox = inference_params["bbox"]
-        images = inference_params["images"]
+        async with temp_files_context(
+            f"{uid}.tif",
+            f"{uid}.geojson",
+            f"{uid}.inference.tif",
+            f"{uid}.{ext}",
+        ) as (image_file, output_file, inference_file, polygon_file):
+            bbox = inference_params["bbox"]
+            images = inference_params["images"]
 
-        model_spec = MODEL_REGISTRY.get(inference_params["model"])
-        is_instance_segmentation = (
-            model_spec.instance_segmentation if model_spec else False
-        )
-        requires_polygonization = model_spec.requires_polygonize if model_spec else True
+            model_spec = MODEL_REGISTRY.get(inference_params["model"])
+            is_instance_segmentation = (
+                model_spec.instance_segmentation if model_spec else False
+            )
+            requires_polygonization = (
+                model_spec.requires_polygonize if model_spec else True
+            )
 
-        if model_spec and not model_spec.requires_window:
-            win_a = images[0]
-            win_b = None
-        else:
-            win_a = images[0]
-            win_b = images[1] if len(images) > 1 else None
+            if model_spec and not model_spec.requires_window:
+                win_a = images[0]
+                win_b = None
+            else:
+                win_a = images[0]
+                win_b = images[1] if len(images) > 1 else None
 
-        context = {
-            "ml_metrics": {
-                "processing_stage": "pipeline_start",
-                "bounding_box": {
-                    "min_lon": bbox[0],
-                    "min_lat": bbox[1],
-                    "max_lon": bbox[2],
-                    "max_lat": bbox[3],
-                },
-                "bbox_area_km2": calculate_area_km2(bbox),
-                "image_urls": [win_a] if win_b is None else [win_a, win_b],
-                "model_path": inference_params.get("model", "unknown"),
-                "gpu_enabled": gpu is not None,
+            context = {
+                "ml_metrics": {
+                    "processing_stage": "pipeline_start",
+                    "bounding_box": {
+                        "min_lon": bbox[0],
+                        "min_lat": bbox[1],
+                        "max_lon": bbox[2],
+                        "max_lat": bbox[3],
+                    },
+                    "bbox_area_km2": calculate_area_km2(bbox),
+                    "image_urls": [win_a] if win_b is None else [win_a, win_b],
+                    "model_path": inference_params.get("model", "unknown"),
+                    "gpu_enabled": gpu is not None,
+                }
             }
-        }
 
-        if is_instance_segmentation:
-            # Instance segmentation: download + run-instance-segmentation
-            output_file = temp_dir / f"{uid}.geojson"
-            try:
+            if is_instance_segmentation:
+                # Instance segmentation: download + run-instance-segmentation
                 download_result = await download_images(
                     image_file, win_a, win_b, bbox, context
                 )
@@ -398,15 +402,7 @@ class InferenceService:
 
                 return data
 
-            finally:
-                image_file.unlink(missing_ok=True)
-                output_file.unlink(missing_ok=True)
-
-        # Standard semantic segmentation pipeline
-        inference_file = temp_dir / f"{uid}.inference.tif"
-        polygon_file = temp_dir / f"{uid}.{'ndjson' if ndjson else 'json'}"
-
-        try:
+            # Standard semantic segmentation pipeline
             inference_result = await execute_inference_pipeline(
                 image_file,
                 inference_file,
@@ -467,11 +463,6 @@ class InferenceService:
                 )
 
             return data
-
-        finally:
-            image_file.unlink(missing_ok=True)
-            inference_file.unlink(missing_ok=True)
-            polygon_file.unlink(missing_ok=True)
 
     # --- Internal Helper Methods ---
 

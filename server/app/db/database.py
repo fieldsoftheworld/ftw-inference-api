@@ -1,6 +1,6 @@
-from app.db.models import Image, InferenceResult, Project
+from app.db.models import FeedbackRecord, Image, InferenceResult, Project
 
-TABLES = (Image, InferenceResult, Project)
+TABLES = (Image, InferenceResult, Project, FeedbackRecord)
 LOCAL_CAPACITY = 1
 
 

@@ -1,10 +1,10 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import pendulum
-from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
+from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.models import Model
 
 from app.core.config import get_settings
@@ -97,3 +97,33 @@ class InferenceResult(Model):
             cls.scan((cls.project_id == project_id) & (cls.result_type == result_type))
         )
         return max(results, key=lambda x: x.created_at) if results else None
+
+
+class FeedbackRecord(Model):
+    """Stores all user feedback and contribution submissions in a single table.
+
+    feedback_type values:
+      - 'tile_rating'  : quick 1-3 viewport rating
+      - 'tell_us_more' : detailed quality feedback form
+      - 'contribute'   : community contribution interest form
+
+    bbox and resolution are only populated for tile_rating and tell_us_more records.
+    payload stores the full serialised request body as a JSON string.
+    """
+
+    class Meta:
+        table_name = f"{settings.dynamodb.table_prefix}feedback"
+        region = settings.dynamodb.aws_region
+        host = settings.dynamodb.dynamodb_endpoint
+
+    id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
+    feedback_type = UnicodeAttribute()  # 'tile_rating' | 'tell_us_more' | 'contribute'
+    created_at = UTCDateTimeAttribute(default_for_new=lambda: datetime.now(UTC))
+    bbox = UnicodeAttribute(
+        null=True
+    )  # JSON "[minLng,minLat,maxLng,maxLat]" — omitted for contribute
+    resolution = NumberAttribute(
+        null=True
+    )  # pixel resolution in metres — omitted for contribute
+    source_ip = UnicodeAttribute(null=True)  # client IP for future dedup
+    payload = UnicodeAttribute(default="{}")  # full JSON of the request body
