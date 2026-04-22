@@ -1,6 +1,20 @@
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_GOOD_TAGS: frozenset[str] = frozenset({
+    "clean_boundaries",
+    "good_shapes",
+    "better_than_expected",
+})
+_POOR_TAGS: frozenset[str] = frozenset({
+    "over_merged",
+    "fragmented",
+    "missing_fields",
+    "false_positives",
+    "jagged_boundaries",
+    "tiling_artifacts",
+})
 
 
 class TileRatingRequest(BaseModel):
@@ -9,7 +23,7 @@ class TileRatingRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     rating: Literal[1, 2, 3] = Field(
-        ..., description="Quality rating: 1=Not Great, 2=Ok, 3=Great!"
+        ..., description="Quality rating: 1: Poor, 2: Acceptable, 3: Good"
     )
     bbox: list[float] = Field(
         ...,
@@ -26,6 +40,17 @@ class TileRatingRequest(BaseModel):
         ),
     )
 
+    tags: list[str] = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Qualitative tags elaborating on the rating. "
+            "Rating 3 (Good): clean_boundaries, good_shapes, better_than_expected. "
+            "Rating 1/2 (Poor/Acceptable): over_merged, fragmented, missing_fields, "
+            "false_positives, jagged_boundaries, tiling_artifacts."
+        ),
+    )
+
     @field_validator("bbox")
     @classmethod
     def validate_bbox(cls, v: list[float]) -> list[float]:
@@ -35,6 +60,20 @@ class TileRatingRequest(BaseModel):
         if min_lat > max_lat:
             raise ValueError("bbox minLat must be <= maxLat")
         return v
+
+    @model_validator(mode="after")
+    def validate_tags_match_rating(self) -> Self:
+        tag_set = set(self.tags)
+        if len(tag_set) != len(self.tags):
+            raise ValueError("tags must not contain duplicates")
+        allowed = _GOOD_TAGS if self.rating == 3 else _POOR_TAGS
+        invalid = tag_set - allowed
+        if invalid:
+            raise ValueError(
+                f"Invalid tags for rating {self.rating}: {sorted(invalid)}. "
+                f"Allowed: {sorted(allowed)}"
+            )
+        return self
 
 
 class TileRatingResponse(BaseModel):
@@ -203,5 +242,13 @@ class AreaSummaryResponse(BaseModel):
             "Count of ratings for each value: "
             '[{"level": 1, "count": n}, {"level": 2, "count": n}, '
             '{"level": 3, "count": n}]'
+        ),
+    )
+    tag_counts: list[dict[str, str | int]] = Field(
+        default_factory=list,
+        description=(
+            "Frequency of each tag across all ratings in the area, "
+            "sorted by count descending. Only tags that appear at least once "
+            "are included."
         ),
     )
