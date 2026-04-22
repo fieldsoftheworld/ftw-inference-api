@@ -23,8 +23,11 @@ VALID_TILE_RATING = {
 VALID_TELL_US_MORE = {
     "quality_feedback": "Boundaries look reasonable but miss some small parcels.",
     "use_case": "Crop monitoring for smallholder farms.",
+    "rating": 2,
     "bbox": VALID_BBOX,
     "resolution": 76.4,
+    "confidence_threshold": 50,
+    "tags": ["fragmented"],
 }
 
 VALID_CONTRIBUTE = {
@@ -177,6 +180,20 @@ def test_tell_us_more_success(client: TestClient) -> None:
 def test_tell_us_more_invalid_email(client: TestClient) -> None:
     """An email lacking '@' is rejected with 400 (app validation handler)."""
     payload = {**VALID_TELL_US_MORE, "email": "not-an-email"}
+    response = client.post(TELL_US_MORE_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tell_us_more_missing_tags_rejected(client: TestClient) -> None:
+    """Tags is required on tell-us-more (inherited from TileRatingRequest)."""
+    payload = {k: v for k, v in VALID_TELL_US_MORE.items() if k != "tags"}
+    response = client.post(TELL_US_MORE_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tell_us_more_wrong_tags_for_rating_rejected(client: TestClient) -> None:
+    """Tag-set validator from TileRatingRequest applies on tell-us-more too."""
+    payload = {**VALID_TELL_US_MORE, "rating": 3, "tags": ["fragmented"]}
     response = client.post(TELL_US_MORE_URL, json=payload)
     assert response.status_code == 400
 
