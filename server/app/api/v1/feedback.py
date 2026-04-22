@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 
 from fastapi import APIRouter, HTTPException, status
 from pynamodb.exceptions import PutError, ScanError
@@ -34,7 +35,7 @@ def _bboxes_intersect(a: list[float], b: list[float]) -> bool:
 
 
 @feedback_router.post(
-    "/tile-rating",
+    "/rating",
     status_code=status.HTTP_200_OK,
 )
 async def submit_tile_rating(
@@ -175,6 +176,7 @@ async def get_area_summary(
     **Rate limit:** 60 requests per minute per IP.
     """
     matching_ratings: list[int] = []
+    matching_tags: list[str] = []
 
     try:
         scan_results = list(
@@ -200,6 +202,9 @@ async def get_area_summary(
             rating = record_payload.get("rating")
             if isinstance(rating, int) and rating in (1, 2, 3):
                 matching_ratings.append(rating)
+            tags = record_payload.get("tags")
+            if isinstance(tags, list):
+                matching_tags.extend(tags)
 
     if not matching_ratings:
         raise HTTPException(
@@ -209,6 +214,11 @@ async def get_area_summary(
 
     total = len(matching_ratings)
     avg = round(sum(matching_ratings) / total, 2)
+    tag_counter = Counter(matching_tags)
+    tag_counts: list[dict[str, str | int]] = [
+        {"tag": tag, "count": count}
+        for tag, count in sorted(tag_counter.items(), key=lambda x: -x[1])
+    ]
 
     return AreaSummaryResponse(
         bbox=bbox,
@@ -219,4 +229,5 @@ async def get_area_summary(
             {"level": 2, "count": matching_ratings.count(2)},
             {"level": 3, "count": matching_ratings.count(3)},
         ],
+        tag_counts=tag_counts,
     )
