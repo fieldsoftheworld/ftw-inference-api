@@ -968,6 +968,7 @@ components:
         - rating
         - bbox
         - resolution
+        - tags
       properties:
         rating:
           type: integer
