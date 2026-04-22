@@ -40,11 +40,11 @@ class TileRatingRequest(BaseModel):
         ),
     )
 
-    tags: list[str] | None = Field(
-        default=None,
+    tags: list[str] = Field(
+        ...,
         min_length=1,
         description=(
-            "Optional qualitative tags elaborating on the rating. "
+            "Qualitative tags elaborating on the rating. "
             "Rating 3 (Good): clean_boundaries, good_shapes, better_than_expected. "
             "Rating 1/2 (Poor/Acceptable): over_merged, fragmented, missing_fields, "
             "false_positives, jagged_boundaries, tiling_artifacts."
@@ -63,8 +63,6 @@ class TileRatingRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_tags_match_rating(self) -> Self:
-        if self.tags is None:
-            return self
         tag_set = set(self.tags)
         if len(tag_set) != len(self.tags):
             raise ValueError("tags must not contain duplicates")

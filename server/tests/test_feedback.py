@@ -16,6 +16,7 @@ VALID_TILE_RATING = {
     "rating": 2,
     "bbox": VALID_BBOX,
     "resolution": 76.4,
+    "tags": ["fragmented"],
 }
 
 VALID_TELL_US_MORE = {
@@ -124,6 +125,13 @@ def test_old_tile_rating_path_returns_404(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_tile_rating_missing_tags_rejected(client: TestClient) -> None:
+    """A submission without `tags` is rejected (tags is required per spec)."""
+    payload = {k: v for k, v in VALID_TILE_RATING.items() if k != "tags"}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
 # ---------------------------------------------------------------------------
 # tell-us-more
 # ---------------------------------------------------------------------------
@@ -206,17 +214,6 @@ def test_area_summary_returns_aggregated_ratings(feedback_client: TestClient) ->
     tag_map = {item["tag"]: item["count"] for item in data["tag_counts"]}
     assert tag_map["clean_boundaries"] == 1
     assert tag_map["fragmented"] == 1
-
-
-def test_area_summary_tag_counts_empty_when_no_tags(
-    feedback_client: TestClient,
-) -> None:
-    """area-summary returns tag_counts as empty list when ratings have no tags."""
-    feedback_client.post(TILE_RATING_URL, json=VALID_TILE_RATING)
-
-    response = feedback_client.get(AREA_SUMMARY_URL, params={"bbox": VALID_BBOX_STR})
-    assert response.status_code == 200
-    assert response.json()["tag_counts"] == []
 
 
 def test_area_summary_tag_counts_sorted_descending(
