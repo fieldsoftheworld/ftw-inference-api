@@ -1045,54 +1045,40 @@ components:
             applied dedup logic and updated an existing record.
 
     TellUsMoreRequest:
-      type: object
-      required:
-        - quality_feedback
-        - use_case
-        - bbox
-        - resolution
-      properties:
-        rating:
-          type: integer
-          enum: [1, 2, 3]
-          description: |-
-            Optional rating carried over from the tile-rating form if the
-            user rated before clicking "Tell Us More".
-        quality_feedback:
-          type: string
-          minLength: 1
-          maxLength: 5000
-          description: |-
-            Required. Response to: "What was good/bad? How must the field
-            boundaries improve to be useful to you?"
-        use_case:
-          type: string
-          minLength: 1
-          maxLength: 2000
-          description: |-
-            Required. Response to: "How would you like to use field
-            boundaries? Tell us about your use case."
-        name:
-          type: string
-          maxLength: 200
-          description: Optional submitter name.
-        email:
-          type: string
-          format: email
-          maxLength: 254
-          description: Optional submitter email.
-        organization:
-          type: string
-          maxLength: 200
-          description: Optional submitter organization.
-        bbox:
-          $ref: '#/components/schemas/Bbox'
-        resolution:
-          type: number
-          minimum: 0
-          description: |-
-            Pixel resolution in meters at the time of the feedback submission.
-            Indicates how closely the user was inspecting the data when forming their opinion.
+      allOf:
+        - $ref: '#/components/schemas/TileRatingRequest'
+        - type: object
+          required:
+            - quality_feedback
+            - use_case
+          properties:
+            quality_feedback:
+              type: string
+              minLength: 1
+              maxLength: 5000
+              description: |-
+                Required. Response to: "What was good/bad? How must the field
+                boundaries improve to be useful to you?"
+            use_case:
+              type: string
+              minLength: 1
+              maxLength: 2000
+              description: |-
+                Required. Response to: "How would you like to use field
+                boundaries? Tell us about your use case."
+            name:
+              type: string
+              maxLength: 200
+              description: Optional submitter name.
+            email:
+              type: string
+              format: email
+              maxLength: 254
+              description: Optional submitter email.
+            organization:
+              type: string
+              maxLength: 200
+              description: Optional submitter organization.
     TellUsMoreResponse:
       type: object
       required:
