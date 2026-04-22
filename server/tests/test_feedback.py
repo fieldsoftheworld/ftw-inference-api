@@ -16,6 +16,7 @@ VALID_TILE_RATING = {
     "rating": 2,
     "bbox": VALID_BBOX,
     "resolution": 76.4,
+    "confidence_threshold": 50,
     "tags": ["fragmented"],
 }
 
@@ -128,6 +129,33 @@ def test_old_tile_rating_path_returns_404(client: TestClient) -> None:
 def test_tile_rating_missing_tags_rejected(client: TestClient) -> None:
     """A submission without `tags` is rejected (tags is required per spec)."""
     payload = {k: v for k, v in VALID_TILE_RATING.items() if k != "tags"}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_missing_confidence_threshold_rejected(client: TestClient) -> None:
+    """A submission without `confidence_threshold` is rejected (required per spec)."""
+    payload = {
+        k: v for k, v in VALID_TILE_RATING.items() if k != "confidence_threshold"
+    }
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_confidence_threshold_below_zero_rejected(
+    client: TestClient,
+) -> None:
+    """A confidence_threshold below 0 is rejected (must be 0-100)."""
+    payload = {**VALID_TILE_RATING, "confidence_threshold": -1}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_confidence_threshold_above_hundred_rejected(
+    client: TestClient,
+) -> None:
+    """A confidence_threshold above 100 is rejected (must be 0-100)."""
+    payload = {**VALID_TILE_RATING, "confidence_threshold": 101}
     response = client.post(TILE_RATING_URL, json=payload)
     assert response.status_code == 400
 

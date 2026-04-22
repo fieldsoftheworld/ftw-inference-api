@@ -39,6 +39,15 @@ class TileRatingRequest(BaseModel):
             "Indicates how closely the user was inspecting the data."
         ),
     )
+    confidence_threshold: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description=(
+            "Confidence threshold (0-100 %) that was selected when the user "
+            "submitted the rating."
+        ),
+    )
 
     tags: list[str] = Field(
         ...,
