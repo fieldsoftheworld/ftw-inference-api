@@ -39,6 +39,15 @@ class TileRatingRequest(BaseModel):
             "Indicates how closely the user was inspecting the data."
         ),
     )
+    confidence_threshold: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description=(
+            "Confidence threshold (0-100 %) that was selected when the user "
+            "submitted the rating."
+        ),
+    )
 
     tags: list[str] = Field(
         ...,
@@ -89,10 +98,13 @@ class TileRatingResponse(BaseModel):
     )
 
 
-class TellUsMoreRequest(BaseModel):
-    """Request body for the tell-us-more endpoint."""
+class TellUsMoreRequest(TileRatingRequest):
+    """Request body for the tell-us-more endpoint.
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    Inherits all required fields and validators from TileRatingRequest
+    (rating, bbox, resolution, confidence_threshold, tags) and adds the
+    long-form prose fields plus optional submitter contact info.
+    """
 
     quality_feedback: str = Field(
         ...,
@@ -106,24 +118,6 @@ class TellUsMoreRequest(BaseModel):
         max_length=2000,
         description="How would you use field boundaries? Describe your use case.",
     )
-    bbox: list[float] = Field(
-        ...,
-        min_length=4,
-        max_length=4,
-        description="WGS84 viewport bbox [minLng, minLat, maxLng, maxLat]",
-    )
-    resolution: float = Field(
-        ...,
-        ge=0,
-        description=(
-            "Pixel resolution in meters at time of submission. "
-            "Indicates how closely the user was inspecting the data."
-        ),
-    )
-    rating: Literal[1, 2, 3] | None = Field(
-        default=None,
-        description="Optional rating carried over from the tile-rating form",
-    )
     name: str | None = Field(
         default=None, max_length=200, description="Optional submitter name"
     )
@@ -133,16 +127,6 @@ class TellUsMoreRequest(BaseModel):
     organization: str | None = Field(
         default=None, max_length=200, description="Optional submitter organization"
     )
-
-    @field_validator("bbox")
-    @classmethod
-    def validate_bbox(cls, v: list[float]) -> list[float]:
-        min_lng, min_lat, max_lng, max_lat = v
-        if min_lng > max_lng:
-            raise ValueError("bbox minLng must be <= maxLng")
-        if min_lat > max_lat:
-            raise ValueError("bbox minLat must be <= maxLat")
-        return v
 
     @field_validator("email")
     @classmethod

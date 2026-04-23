@@ -16,14 +16,18 @@ VALID_TILE_RATING = {
     "rating": 2,
     "bbox": VALID_BBOX,
     "resolution": 76.4,
+    "confidence_threshold": 50,
     "tags": ["fragmented"],
 }
 
 VALID_TELL_US_MORE = {
     "quality_feedback": "Boundaries look reasonable but miss some small parcels.",
     "use_case": "Crop monitoring for smallholder farms.",
+    "rating": 2,
     "bbox": VALID_BBOX,
     "resolution": 76.4,
+    "confidence_threshold": 50,
+    "tags": ["fragmented"],
 }
 
 VALID_CONTRIBUTE = {
@@ -132,6 +136,33 @@ def test_tile_rating_missing_tags_rejected(client: TestClient) -> None:
     assert response.status_code == 400
 
 
+def test_tile_rating_missing_confidence_threshold_rejected(client: TestClient) -> None:
+    """A submission without `confidence_threshold` is rejected (required per spec)."""
+    payload = {
+        k: v for k, v in VALID_TILE_RATING.items() if k != "confidence_threshold"
+    }
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_confidence_threshold_below_zero_rejected(
+    client: TestClient,
+) -> None:
+    """A confidence_threshold below 0 is rejected (must be 0-100)."""
+    payload = {**VALID_TILE_RATING, "confidence_threshold": -1}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_confidence_threshold_above_hundred_rejected(
+    client: TestClient,
+) -> None:
+    """A confidence_threshold above 100 is rejected (must be 0-100)."""
+    payload = {**VALID_TILE_RATING, "confidence_threshold": 101}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
 # ---------------------------------------------------------------------------
 # tell-us-more
 # ---------------------------------------------------------------------------
@@ -149,6 +180,20 @@ def test_tell_us_more_success(client: TestClient) -> None:
 def test_tell_us_more_invalid_email(client: TestClient) -> None:
     """An email lacking '@' is rejected with 400 (app validation handler)."""
     payload = {**VALID_TELL_US_MORE, "email": "not-an-email"}
+    response = client.post(TELL_US_MORE_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tell_us_more_missing_tags_rejected(client: TestClient) -> None:
+    """Tags is required on tell-us-more (inherited from TileRatingRequest)."""
+    payload = {k: v for k, v in VALID_TELL_US_MORE.items() if k != "tags"}
+    response = client.post(TELL_US_MORE_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tell_us_more_wrong_tags_for_rating_rejected(client: TestClient) -> None:
+    """Tag-set validator from TileRatingRequest applies on tell-us-more too."""
+    payload = {**VALID_TELL_US_MORE, "rating": 3, "tags": ["fragmented"]}
     response = client.post(TELL_US_MORE_URL, json=payload)
     assert response.status_code == 400
 
