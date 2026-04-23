@@ -1,5 +1,6 @@
 """ML pipeline orchestration functions."""
 
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ from app.ml.commands import (
     build_instance_segmentation_command,
     build_polygonize_command,
 )
+from app.services.cache_service import check_s2_scene_exists, save_to_cache
 
 logger = get_logger(__name__)
 
@@ -26,17 +28,39 @@ async def download_images(
 ) -> dict[str, Any]:
     """Download satellite images using ftw tool. Handles both single and dual window."""
     download_start = time.time()
-    logger.info("Downloading images", context)
 
+    # Check cache first (only for dual window scenarios)
+    if win_b is not None:
+        cached, cached_path = await check_s2_scene_exists(win_a, win_b, bbox)
+
+        if cached and cached_path is not None:
+            logger.info("Using cached S2 scene", extra=context)
+            shutil.copy2(cached_path, image_file)
+            download_time = round((time.time() - download_start) * 1000, 2)
+            image_size_mb = round(image_file.stat().st_size / (1024 * 1024), 2)
+
+            return {
+                "download_time_ms": download_time,
+                "image_size_mb": image_size_mb,
+                "from_cache": True,
+            }
+
+    # Not cached or single window - download from S3
+    logger.info("Downloading images from S3", extra=context)
     cmd = build_download_command(image_file, win_a, win_b, bbox)
     await run_async(cmd)
 
     download_time = round((time.time() - download_start) * 1000, 2)
     image_size_mb = round(image_file.stat().st_size / (1024 * 1024), 2)
 
+    # Save to cache for next time (only for dual window scenarios)
+    if win_b is not None:
+        await save_to_cache(image_file, win_a, win_b, bbox)
+
     return {
         "download_time_ms": download_time,
         "image_size_mb": image_size_mb,
+        "from_cache": False,
     }
 
 
