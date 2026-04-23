@@ -17,6 +17,7 @@ VALID_TILE_RATING = {
     "bbox": VALID_BBOX,
     "resolution": 76.4,
     "confidence_threshold": 50,
+    "year": 2025,
     "tags": ["fragmented"],
 }
 
@@ -27,6 +28,7 @@ VALID_TELL_US_MORE = {
     "bbox": VALID_BBOX,
     "resolution": 76.4,
     "confidence_threshold": 50,
+    "year": 2025,
     "tags": ["fragmented"],
 }
 
@@ -159,6 +161,27 @@ def test_tile_rating_confidence_threshold_above_hundred_rejected(
 ) -> None:
     """A confidence_threshold above 100 is rejected (must be 0-100)."""
     payload = {**VALID_TILE_RATING, "confidence_threshold": 101}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_missing_year_rejected(client: TestClient) -> None:
+    """A submission without `year` is rejected (required per spec)."""
+    payload = {k: v for k, v in VALID_TILE_RATING.items() if k != "year"}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_year_before_2024_rejected(client: TestClient) -> None:
+    """Year before 2024 is rejected (must be 2024-2025 per spec)."""
+    payload = {**VALID_TILE_RATING, "year": 2023}
+    response = client.post(TILE_RATING_URL, json=payload)
+    assert response.status_code == 400
+
+
+def test_tile_rating_year_after_2025_rejected(client: TestClient) -> None:
+    """Year after 2025 is rejected (must be 2024-2025 per spec)."""
+    payload = {**VALID_TILE_RATING, "year": 2026}
     response = client.post(TILE_RATING_URL, json=payload)
     assert response.status_code == 400
 
