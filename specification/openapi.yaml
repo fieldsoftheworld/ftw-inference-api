@@ -969,6 +969,7 @@ components:
         - bbox
         - resolution
         - confidence_threshold
+        - year
         - tags
       properties:
         rating:
@@ -989,6 +990,11 @@ components:
           maximum: 100
           description: |-
             Confidence threshold (0-100 %) that was selected when the user submitted the rating.
+        year:
+          type: integer
+          minimum: 2024
+          maximum: 2025
+          description: The year of the fields the user was rating.
         tags:
           type: array
           minItems: 1
