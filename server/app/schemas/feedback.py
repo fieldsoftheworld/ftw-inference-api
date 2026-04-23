@@ -48,6 +48,12 @@ class TileRatingRequest(BaseModel):
             "submitted the rating."
         ),
     )
+    year: int = Field(
+        ...,
+        ge=2024,
+        le=2025,
+        description="The year of the fields the user was rating.",
+    )
 
     tags: list[str] = Field(
         ...,
