@@ -20,10 +20,12 @@ logger = get_logger(__name__)
 
 
 # Exception handlers
-def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+def validation_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle FastAPI validation errors with detailed logging."""
+    # Starlette types handlers as taking any Exception; this one is only
+    # registered for RequestValidationError.
+    if not isinstance(exc, RequestValidationError):
+        raise exc
     first_error = (
         exc.errors()[0] if exc.errors() else {"msg": "Unknown validation error"}
     )
@@ -156,7 +158,7 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(
         RequestValidationError,
-        validation_exception_handler,  # type: ignore[arg-type]
+        validation_exception_handler,
     )
 
     app.include_router(v1_router, prefix="/v1")

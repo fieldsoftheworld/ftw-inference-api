@@ -162,12 +162,12 @@ server/
 
 ### Code Quality
 
-Uses [Ruff](https://docs.astral.sh/ruff/) for linting/formatting and pre-commit hooks for quality checks.
+Uses [Ruff](https://docs.astral.sh/ruff/) for linting/formatting, [ty](https://docs.astral.sh/ty/) for type checking, and pre-commit hooks for quality checks.
 
 ```bash
 uv run ruff check .           # Check code without fixing
 uv run ruff format .          # Auto-format code
-uv run mypy server/app        # Type check
+uv run ty check               # Type check
 ```
 
 Setup pre-commit:

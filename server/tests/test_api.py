@@ -1,6 +1,10 @@
 import re
 from pathlib import Path
 
+import pytest
+from app.main import validation_exception_handler
+from starlette.requests import Request
+
 DATETIME_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$"
 
 
@@ -309,3 +313,10 @@ def test_polygonize_endpoint(client, tmp_path):
 
     response = client.put(f"/v1/projects/{project_id}/polygons", json=polygonize_params)
     assert response.status_code == 202
+
+
+def test_validation_exception_handler_reraises_other_exceptions():
+    """The handler only handles RequestValidationError and re-raises the rest."""
+    request = Request({"type": "http", "method": "GET", "path": "/", "headers": []})
+    with pytest.raises(RuntimeError, match="boom"):
+        validation_exception_handler(request, RuntimeError("boom"))

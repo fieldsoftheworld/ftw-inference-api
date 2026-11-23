@@ -1,7 +1,8 @@
 import json
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import pendulum
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
@@ -14,17 +15,57 @@ from app.utils.name_generator import generate_project_id
 settings = get_settings()
 
 
+class _TableMeta:
+    """Base for PynamoDB ``Meta`` classes.
+
+    Declares the members of ``pynamodb.models.MetaProtocol`` as class variables
+    so type checkers accept the class object as a ``MetaProtocol``. Members
+    without a value here stay unset, so PynamoDB still fills in its own
+    defaults when the model class is created.
+    """
+
+    table_name: ClassVar[str]
+    read_capacity_units: ClassVar[int | None]
+    write_capacity_units: ClassVar[int | None]
+    region: ClassVar[str | None] = settings.dynamodb.aws_region
+    host: ClassVar[str | None] = settings.dynamodb.dynamodb_endpoint  # local dev
+    connect_timeout_seconds: ClassVar[int]
+    read_timeout_seconds: ClassVar[int]
+    max_retry_attempts: ClassVar[int]
+    max_pool_connections: ClassVar[int]
+    extra_headers: ClassVar[Mapping[str, str]]
+    aws_access_key_id: ClassVar[str | None]
+    aws_secret_access_key: ClassVar[str | None]
+    aws_session_token: ClassVar[str | None]
+    billing_mode: ClassVar[str | None]
+    tags: ClassVar[dict[str, str] | None]
+    stream_view_type: ClassVar[str | None]
+
+
+class _ProjectMeta(_TableMeta):
+    table_name = f"{settings.dynamodb.table_prefix}projects"
+
+
+class _ImageMeta(_TableMeta):
+    table_name = f"{settings.dynamodb.table_prefix}images"
+
+
+class _InferenceResultMeta(_TableMeta):
+    table_name = f"{settings.dynamodb.table_prefix}inference-results"
+
+
+class _FeedbackMeta(_TableMeta):
+    table_name = f"{settings.dynamodb.table_prefix}feedback"
+
+
 class Project(Model):
-    class Meta:
-        table_name = f"{settings.dynamodb.table_prefix}projects"
-        region = settings.dynamodb.aws_region
-        host = settings.dynamodb.dynamodb_endpoint  # For local development
+    Meta = _ProjectMeta
 
     id = UnicodeAttribute(hash_key=True, default_for_new=lambda: generate_project_id())
     title = UnicodeAttribute()
     status = UnicodeAttribute(default=ProjectStatus.CREATED.value)
     progress = UnicodeAttribute(null=True)  # Store as string
-    created_at = UTCDateTimeAttribute(default_for_new=datetime.utcnow)
+    created_at = UTCDateTimeAttribute(default_for_new=lambda: datetime.now(UTC))
     parameters = UnicodeAttribute(default="{}")
     results = UnicodeAttribute(default="{}")
 
@@ -52,16 +93,13 @@ class Project(Model):
 
 
 class Image(Model):
-    class Meta:
-        table_name = f"{settings.dynamodb.table_prefix}images"
-        region = settings.dynamodb.aws_region
-        host = settings.dynamodb.dynamodb_endpoint
+    Meta = _ImageMeta
 
     id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
     project_id = UnicodeAttribute()
     window = UnicodeAttribute()  # 'a' or 'b'
     file_path = UnicodeAttribute()
-    created_at = UTCDateTimeAttribute(default_for_new=datetime.utcnow)
+    created_at = UTCDateTimeAttribute(default_for_new=lambda: datetime.now(UTC))
 
     @classmethod
     def get_by_project_and_window(cls, project_id: str, window: str) -> "Image | None":
@@ -76,17 +114,14 @@ class Image(Model):
 
 
 class InferenceResult(Model):
-    class Meta:
-        table_name = f"{settings.dynamodb.table_prefix}inference-results"
-        region = settings.dynamodb.aws_region
-        host = settings.dynamodb.dynamodb_endpoint
+    Meta = _InferenceResultMeta
 
     id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
     project_id = UnicodeAttribute()
     model_id = UnicodeAttribute()
     result_type = UnicodeAttribute()  # 'image' or 'geojson'
     file_path = UnicodeAttribute()
-    created_at = UTCDateTimeAttribute(default_for_new=datetime.utcnow)
+    created_at = UTCDateTimeAttribute(default_for_new=lambda: datetime.now(UTC))
 
     @classmethod
     def get_latest_by_project_and_type(
@@ -111,10 +146,7 @@ class FeedbackRecord(Model):
     payload stores the full serialised request body as a JSON string.
     """
 
-    class Meta:
-        table_name = f"{settings.dynamodb.table_prefix}feedback"
-        region = settings.dynamodb.aws_region
-        host = settings.dynamodb.dynamodb_endpoint
+    Meta = _FeedbackMeta
 
     id = UnicodeAttribute(hash_key=True, default_for_new=lambda: str(uuid.uuid4()))
     feedback_type = UnicodeAttribute()  # 'tile_rating' | 'tell_us_more' | 'contribute'
