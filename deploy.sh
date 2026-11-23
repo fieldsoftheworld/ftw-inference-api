@@ -4,16 +4,17 @@
 set -e
 
 # Parse command line arguments
-BRANCH="main"
+REF="main"
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -b|--branch)
-            BRANCH="$2"
+        -b|--branch|--ref)
+            REF="$2"
             shift 2
             ;;
         -h|--help)
-            echo "Usage: $0 [-b|--branch BRANCH_NAME]"
-            echo "  -b, --branch    Git branch to deploy (default: main)"
+            echo "Usage: $0 [--ref REF | -b|--branch BRANCH_NAME]"
+            echo "  --ref           Git branch or commit SHA to deploy (default: main)"
+            echo "  -b, --branch    Alias for --ref"
             exit 0
             ;;
         *)
@@ -24,7 +25,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "Deploying FTW Inference API on EC2..."
-echo "Using branch: $BRANCH"
+echo "Using ref: $REF"
 
 echo "Updating system packages..."
 sudo apt-get update
@@ -47,14 +48,17 @@ uv python install 3.12
 echo "Cloning repository..."
 cd ~
 if [ -d "ftw-inference-api" ]; then
-    echo "Repository already exists, switching to branch $BRANCH..."
+    echo "Repository already exists, switching to $REF..."
     cd ftw-inference-api
     git fetch origin
-    git checkout "$BRANCH"
-    git pull origin "$BRANCH"
 else
-    git clone -b "$BRANCH" https://github.com/fieldsoftheworld/ftw-inference-api.git
+    git clone https://github.com/fieldsoftheworld/ftw-inference-api.git
     cd ftw-inference-api
+fi
+git checkout --force "$REF"
+# Only a branch can be pulled; a commit SHA is checked out as a detached HEAD.
+if git show-ref --verify --quiet "refs/remotes/origin/$REF"; then
+    git pull origin "$REF"
 fi
 
 echo "Installing Python dependencies with UV..."
