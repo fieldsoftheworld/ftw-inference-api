@@ -28,10 +28,12 @@ For rapid deployment on AWS EC2 instances using Ubuntu Deep Learning AMI with NV
 curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash
 ```
 
-To deploy a specific branch:
+To deploy a specific branch or commit:
 ```bash
-curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash -s -- -b your-branch-name
+curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash -s -- --ref your-branch-name
+curl -L https://raw.githubusercontent.com/fieldsoftheworld/ftw-inference-api/main/deploy.sh | bash -s -- --ref <40-char-commit-sha>
 ```
+(`-b/--branch` still works as an alias for `--ref`.)
 
 This script will:
 - Install UV package manager
@@ -51,6 +53,44 @@ sudo systemctl stop ftw-inference-api       # Stop service
 sudo systemctl restart ftw-inference-api    # Restart service
 sudo journalctl -u ftw-inference-api -f     # Follow logs
 sudo journalctl -u ftw-inference-api --since today  # Today's logs
+```
+
+### Automated deploys (dev)
+
+Every push to `main` deploys that exact commit to the dev environment once the CI `test`
+job passes (`.github/workflows/deploy.yml`, called from `ci.yml`). The workflow:
+
+1. Assumes the `AWS_DEPLOY_ROLE_ARN` role through GitHub OIDC (the role trusts only `main`).
+2. Finds the **running** EC2 instances tagged `Purpose=fastapi-app`, `Environment=dev`,
+   and fails if there are none.
+3. Runs the SSM Command document `ftw-dev-deploy-api` on them. The document checks out the
+   commit in `~/ftw-inference-api` and runs `scripts/update.sh`, which runs
+   `uv sync --frozen`, restarts the service, and waits for `/v1/health`.
+4. Prints the command output (also in CloudWatch log group `/ftw/dev/deploy`) and fails
+   if any instance did not succeed.
+5. On success, stores the commit in SSM parameter `/ftw/dev/api/deployed-sha`. New
+   instances boot that commit, so a replaced instance does not drift to a newer `main`.
+
+**A deploy restarts the service: in-flight and queued tasks are lost.** Deploys never
+overlap (concurrency group `deploy-dev`). If several are waiting, GitHub keeps only the
+newest pending run.
+
+**Redeploy or roll back:** run the workflow by hand from `main` with the commit to
+deploy (it must be on `main` and include `scripts/update.sh`, i.e. this workflow or later):
+
+```bash
+gh workflow run deploy.yml --ref main -f sha=<commit-sha-on-main>  # roll back / pin
+gh workflow run deploy.yml --ref main                              # redeploy head of main
+```
+
+There is no automatic rollback. If a deploy fails, the new commit may be checked out
+while the old process is still running (or the service is down); fix forward or
+dispatch an older commit. `git checkout --force` discards any manual edits on the
+instance.
+
+To check what is deployed:
+```bash
+aws ssm get-parameter --name /ftw/dev/api/deployed-sha --query Parameter.Value --output text
 ```
 
 ## Running the Server in Development Mode

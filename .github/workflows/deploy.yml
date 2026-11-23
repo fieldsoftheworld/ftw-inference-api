@@ -1,0 +1,209 @@
+name: Deploy (dev)
+
+# Deploys an exact commit of `main` to the running dev instances with SSM Run Command.
+# Called by CI after tests pass on a push to main, or dispatched manually to redeploy
+# or roll back to an older commit of main.
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit SHA of main to deploy
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA of main to deploy (default: head of main)"
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  DEPLOY_DOCUMENT: ftw-dev-deploy-api
+  DEPLOYED_SHA_PARAMETER: /ftw/dev/api/deployed-sha
+  DEPLOY_LOG_GROUP: /ftw/dev/deploy
+
+jobs:
+  deploy:
+    name: Deploy to dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    steps:
+      - name: Require main
+        # The deploy role only trusts refs/heads/main, so fail early with a clear message.
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Deploys run only from main (got $GITHUB_REF). Dispatch this workflow from main and pass the commit in 'sha'."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve commit
+        id: resolve
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          ref="${INPUT_SHA:-$GITHUB_SHA}"
+          if ! [[ "$ref" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+            echo "::error::'$ref' is not a commit SHA"
+            exit 1
+          fi
+          if ! sha=$(git rev-parse --verify --quiet "${ref}^{commit}"); then
+            echo "::error::Commit $ref not found"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::Commit $sha is not on main"
+            exit 1
+          fi
+          if ! git cat-file -e "$sha:scripts/update.sh" 2>/dev/null; then
+            echo "::error::Commit $sha predates scripts/update.sh and can't be deployed by this workflow"
+            exit 1
+          fi
+          echo "Deploying $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Find running instances
+        id: instances
+        run: |
+          set -euo pipefail
+          ids=$(aws ec2 describe-instances \
+            --filters \
+              Name=tag:Purpose,Values=fastapi-app \
+              Name=tag:Environment,Values=dev \
+              Name=instance-state-name,Values=running \
+            --query 'Reservations[].Instances[].InstanceId' \
+            --output text)
+          if [ -z "$ids" ]; then
+            echo "::error::No running instances tagged Purpose=fastapi-app, Environment=dev"
+            exit 1
+          fi
+          echo "Instances: $ids"
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+
+      - name: Send deploy command
+        id: send
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+          INSTANCE_IDS: ${{ steps.instances.outputs.ids }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086 # word-splitting the instance ID list is intended
+          command_id=$(aws ssm send-command \
+            --document-name "$DEPLOY_DOCUMENT" \
+            --instance-ids $INSTANCE_IDS \
+            --parameters "sha=$SHA" \
+            --comment "GitHub Actions run $GITHUB_RUN_ID: deploy ${SHA:0:12}" \
+            --cloud-watch-output-config "CloudWatchOutputEnabled=true,CloudWatchLogGroupName=$DEPLOY_LOG_GROUP" \
+            --query Command.CommandId \
+            --output text)
+          echo "Command ID: $command_id"
+          echo "command_id=$command_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deploy to finish
+        id: wait
+        env:
+          COMMAND_ID: ${{ steps.send.outputs.command_id }}
+          INSTANCE_IDS: ${{ steps.instances.outputs.ids }}
+        run: |
+          set -euo pipefail
+          # The SSM document times out after ~600s; allow for delivery on top of that.
+          deadline=$((SECONDS + 900))
+          failed=0
+          results=""
+          for id in $INSTANCE_IDS; do
+            status=""
+            while :; do
+              if out=$(aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" --instance-id "$id" --output json 2>&1); then
+                status=$(jq -r .Status <<<"$out")
+                case "$status" in
+                  Success|Failed|Cancelled|TimedOut) break ;;
+                esac
+              elif ! grep -q InvocationDoesNotExist <<<"$out"; then
+                echo "$out" >&2
+                exit 1
+              fi
+              if ((SECONDS >= deadline)); then
+                status="WorkflowTimedOut"
+                break
+              fi
+              sleep 10
+            done
+
+            echo "::group::$id: $status"
+            if [ -n "${out:-}" ] && jq -e . >/dev/null 2>&1 <<<"$out"; then
+              echo "--- stdout ---"
+              jq -r '.StandardOutputContent // ""' <<<"$out"
+              echo "--- stderr ---"
+              jq -r '.StandardErrorContent // ""' <<<"$out"
+            fi
+            echo "::endgroup::"
+
+            results+="| \`$id\` | $status |"$'\n'
+            if [ "$status" != "Success" ]; then
+              echo "::error::Deploy on $id finished with status $status"
+              failed=1
+            fi
+          done
+          {
+            echo "results<<EOF"
+            printf '%s' "$results"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit "$failed"
+
+      - name: Record deployed commit
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          aws ssm put-parameter \
+            --name "$DEPLOYED_SHA_PARAMETER" \
+            --value "$SHA" \
+            --overwrite
+
+      - name: Summary
+        if: always() && steps.resolve.outputs.sha != ''
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+          COMMAND_ID: ${{ steps.send.outputs.command_id }}
+          RESULTS: ${{ steps.wait.outputs.results }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          log_group_url="https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#logsV2:log-groups/log-group/\$252Fftw\$252Fdev\$252Fdeploy"
+          {
+            echo "## Deploy to dev: $JOB_STATUS"
+            echo
+            echo "- Commit: [\`${SHA:0:12}\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SHA)"
+            echo "- SSM command: \`${COMMAND_ID:-not sent}\`"
+            echo "- Logs: [CloudWatch \`$DEPLOY_LOG_GROUP\`]($log_group_url)"
+            echo
+            if [ -n "$RESULTS" ]; then
+              echo "| Instance | Status |"
+              echo "|---|---|"
+              printf '%s\n' "$RESULTS"
+              echo
+            fi
+            if [ -n "$COMMAND_ID" ]; then
+              echo "> The service was restarted: in-flight and queued tasks were dropped."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

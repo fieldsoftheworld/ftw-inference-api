@@ -40,3 +40,14 @@ jobs:
 
     - name: Run tests with coverage
       run: cd server && uv run pytest -v --cov=app --cov-report=xml --cov-report=term-missing
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      sha: ${{ github.sha }}
+    secrets: inherit
