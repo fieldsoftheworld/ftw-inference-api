@@ -84,10 +84,13 @@ select = [
     "TCH", # flake8-type-checking
     "RUF", # Ruff-specific rules
     "FAST", # FastAPI-specific rules
+    "ANN", # flake8-annotations
 ]
 ignore = [
     "B008",  # Needed for FastAPI DI `Depends()`
 ]
+# Tests are outside the type-checked scope (ty checks server/app only)
+per-file-ignores."server/tests/**" = ["ANN"]
 pydocstyle.convention = "google"
 
 [tool.ruff.format]

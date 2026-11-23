@@ -25,26 +25,15 @@ from app.utils.name_generator import generate_project_id
 logger = get_logger(__name__)
 
 
-def _clean_parameters_for_response(parameters: Any) -> dict[str, Any]:
+def _clean_parameters_for_response(parameters: dict[str, Any]) -> dict[str, Any]:
     """Clean parameters for API response, excluding large fields."""
-    params_dict = _normalize_parameters(parameters)
-    if not params_dict:
+    if not parameters:
         return {}
 
     clean_params: dict[str, Any] = {}
-    _process_inference_params(params_dict, clean_params)
-    _copy_direct_params(params_dict, clean_params)
+    _process_inference_params(parameters, clean_params)
+    _copy_direct_params(parameters, clean_params)
     return clean_params
-
-
-def _normalize_parameters(parameters: Any) -> dict[str, Any]:
-    """Convert parameters to dictionary format."""
-    if isinstance(parameters, dict):
-        return parameters
-    result: dict[str, Any] = (
-        parameters.model_dump() if hasattr(parameters, "model_dump") else {}
-    )
-    return result
 
 
 def _process_inference_params(
@@ -89,7 +78,7 @@ def _copy_direct_params(
 
 
 class ProjectService:
-    def __init__(self, storage: StorageBackend):
+    def __init__(self, storage: StorageBackend) -> None:
         """Initialize ProjectService with storage backend only."""
         self.storage = storage
 

@@ -38,7 +38,7 @@ class InferenceService:
         storage: StorageBackend,
         project_service: ProjectService,
         task_service: TaskService | None = None,
-    ):
+    ) -> None:
         self.storage = storage
         self.project_service = project_service
         self.task_service = task_service
@@ -597,7 +597,7 @@ class InferenceService:
         return result
 
     def _log_ml_start(
-        self, stage: str, project_id: str | None = None, **extra: Any
+        self, stage: str, project_id: str | None = None, **extra: object
     ) -> None:
         """Log ML pipeline start events with consistent structure."""
         context = {"processing_stage": f"{stage}_start", **extra}
@@ -606,7 +606,7 @@ class InferenceService:
         logger.info(f"Starting {stage}", extra={"ml_metrics": context})
 
     def _log_ml_success(
-        self, stage: str, project_id: str | None = None, **extra: Any
+        self, stage: str, project_id: str | None = None, **extra: object
     ) -> None:
         """Log ML pipeline success events with consistent structure."""
         context = {"processing_stage": f"{stage}_complete", **extra}

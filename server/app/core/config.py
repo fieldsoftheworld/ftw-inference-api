@@ -41,7 +41,7 @@ class CORSConfig(BaseModel):
 
     @field_validator("origins", mode="before")
     @classmethod
-    def parse_origins(cls, v: Any) -> Any:
+    def parse_origins(cls, v: object) -> object:
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",")]
         return v

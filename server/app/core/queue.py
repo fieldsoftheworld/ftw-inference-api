@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 import pendulum
 
+from app.core.config import Settings
 from app.core.logging import get_logger
 from app.core.types import TaskStatus, TaskType
 
@@ -202,7 +203,7 @@ class InMemoryQueue:
 class SQSQueue:
     """AWS SQS implementation of QueueBackend - TODO: Implement during migration"""
 
-    def __init__(self, sqs_settings: Any) -> None:
+    def __init__(self, sqs_settings: object) -> None:
         # TODO: Implement SQS-based queue during cloud migration
         # Will use boto3 SQS client for queue operations
         # Workers will be deployed as separate ECS tasks/Lambda functions
@@ -230,7 +231,7 @@ class SQSQueue:
 
 
 def get_queue(
-    settings: Any, task_processors: dict[str, Callable] | None = None
+    settings: Settings, task_processors: dict[str, Callable] | None = None
 ) -> QueueBackend:
     """Get queue backend based on configuration"""
     # For now, always return InMemoryQueue

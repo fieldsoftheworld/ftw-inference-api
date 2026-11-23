@@ -32,8 +32,9 @@ from .dependencies import (
 router = APIRouter()
 
 
-@router.get("/", status_code=status.HTTP_200_OK)
-async def get_root(project_service: ProjectServiceDep) -> Any:
+# response_model=Any keeps the OpenAPI schema it had when the return was `-> Any`
+@router.get("/", response_model=Any, status_code=status.HTTP_200_OK)
+async def get_root(project_service: ProjectServiceDep) -> dict[str, Any]:
     """Get API configuration and available endpoints."""
     return project_service.get_api_configuration()
 

@@ -7,7 +7,7 @@ from app.core.types import TaskStatus, TaskType
 
 
 class TaskService:
-    def __init__(self, queue: QueueBackend):
+    def __init__(self, queue: QueueBackend) -> None:
         self.queue = queue
 
     # --- Public API: Task Submission ---

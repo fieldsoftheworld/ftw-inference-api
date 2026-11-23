@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 
 from ftw_tools.inference.model_registry import MODEL_REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -54,7 +54,7 @@ class InferenceRequest(BaseModel):
 
     @field_validator("model", mode="before")
     @classmethod
-    def reject_unknown_model(cls, v: Any) -> Any:
+    def reject_unknown_model(cls, v: object) -> object:
         """Reject values outside ``allowed_models``, as a ``Literal`` would."""
         if v not in allowed_models:
             *head, last = (repr(m) for m in allowed_models)

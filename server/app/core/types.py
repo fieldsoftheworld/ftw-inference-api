@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum, StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import pendulum
 from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
@@ -45,7 +45,7 @@ class PendulumDateTimeAnnotation:
 
     @classmethod
     def __get_pydantic_core_schema__(
-        cls, _source_type: Any, _handler: GetCoreSchemaHandler
+        cls, _source_type: object, _handler: GetCoreSchemaHandler
     ) -> CoreSchema:
         """Create a schema that validates pendulum.DateTime objects."""
 
@@ -92,7 +92,7 @@ class PendulumDateTimeAnnotation:
 
     @classmethod
     def __get_json_schema__(
-        cls, _source_type: Any, _handler: GetJsonSchemaHandler
+        cls, _source_type: object, _handler: GetJsonSchemaHandler
     ) -> JsonSchemaValue:
         """Get JSON schema for pendulum.DateTime."""
         return {
