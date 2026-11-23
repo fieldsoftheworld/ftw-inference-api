@@ -45,12 +45,12 @@ dev = [
     "moto>=5.2.6,<6",
     # Linting & Type checking
     "ruff>=0.17.6",
-    "mypy>=2.4.1",
     "types-requests>=2.33.0.20261030",
     "types-pyyaml>=6.0.12.20261122",
     "types-aiofiles>=25.1.0.20261107",
     "types-python-jose>=3.5.0.20260408",
     "types-aioboto3>=15.5.0",
+    "ty>=0.0.109",
 ]
 
 [tool.pytest.ini_options]
@@ -95,18 +95,11 @@ quote-style = "double"
 line-ending = "auto"
 preview = true
 
-[tool.mypy]
-python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-exclude = [
-    "^server/tests/.*$"
-]
+[tool.ty.environment]
+python-version = "3.12"
 
-[[tool.mypy.overrides]]
-module = "ftw_tools.*"
-ignore_missing_imports = true
+[tool.ty.src]
+include = ["server/app"]
 
 [tool.bandit]
 exclude_dirs = ["server/tests"]

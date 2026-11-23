@@ -1,5 +1,5 @@
 import pytest
-from app.schemas.requests import InferenceRequest
+from app.schemas.requests import InferenceRequest, allowed_models
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -74,6 +74,23 @@ class TestModelValidation:
                 images=sample_image_urls["single"],
                 bbox=sample_bbox,
             )
+
+    @pytest.mark.parametrize("bad_model", ["this-model-does-not-exist", 123, None])
+    def test_unknown_model_error_is_literal_error(self, bad_model):
+        """Unknown or non-string model ids fail with pydantic's literal_error."""
+        with pytest.raises(ValidationError) as exc_info:
+            InferenceRequest(model=bad_model)
+        (error,) = exc_info.value.errors()
+        assert error["type"] == "literal_error"
+        assert error["loc"] == ("model",)
+        assert error["msg"].startswith("Input should be ")
+        assert error["msg"].endswith(f" or {allowed_models[-1]!r}")
+
+    def test_model_json_schema_lists_allowed_models(self):
+        """The OpenAPI schema advertises the allowed model ids as an enum."""
+        schema = InferenceRequest.model_json_schema()["properties"]["model"]
+        assert schema["type"] == "string"
+        assert schema["enum"] == allowed_models
 
 
 class TestModelEndpoints:

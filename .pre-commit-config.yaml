@@ -17,16 +17,11 @@ repos:
     -   id: check-added-large-files
         args: ['--maxkb=2000']  # Allow up to 2MB for lock files
 
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.1
+-   repo: local
     hooks:
-    -   id: mypy
-        additional_dependencies:
-            - types-requests>=2.31.0
-            - types-PyYAML>=6.0.12.11
-            - types-aiofiles>=24.1.0.20250708
-            - types-aioboto3
-            - types-python-jose>=3.5.0.20250531
-            - aioboto3
-            - moto[s3]
-        exclude: ^(docs/|example-plugin/|tests/fixtures|server/tests/)
+    -   id: ty
+        name: ty
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: false

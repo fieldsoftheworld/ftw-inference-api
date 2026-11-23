@@ -1,7 +1,8 @@
-from typing import Literal
+from typing import Any, Literal
 
 from ftw_tools.inference.model_registry import MODEL_REGISTRY
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from app.core.logging import get_logger
 
@@ -28,8 +29,10 @@ class PolygonizationRequest(BaseModel):
 class InferenceRequest(BaseModel):
     """Parameters for the inference process."""
 
-    model: Literal[tuple(allowed_models)] = Field(  # type: ignore
-        ..., description="The id of the model to use for inference"
+    model: str = Field(
+        ...,
+        description="The id of the model to use for inference",
+        json_schema_extra={"enum": [*allowed_models]},
     )
     bbox: list[float] | None = Field(
         None,
@@ -48,6 +51,18 @@ class InferenceRequest(BaseModel):
     padding: int | None = Field(
         None, description="Pixels to discard from each side of the patch"
     )
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_unknown_model(cls, v: Any) -> Any:
+        """Reject values outside ``allowed_models``, as a ``Literal`` would."""
+        if v not in allowed_models:
+            *head, last = (repr(m) for m in allowed_models)
+            expected = f"{', '.join(head)} or {last}" if head else last
+            raise PydanticCustomError(
+                "literal_error", "Input should be {expected}", {"expected": expected}
+            )
+        return v
 
     @field_validator("model")
     @classmethod
