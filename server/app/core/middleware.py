@@ -1,10 +1,10 @@
 import time
 import uuid
-from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from app.core.logging import client_ip, endpoint, get_logger, request_id
 
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add API-appropriate security headers to all responses."""
 
-    def __init__(self, app: Any, headers: dict[str, str] | None = None) -> None:
+    def __init__(self, app: ASGIApp, headers: dict[str, str] | None = None) -> None:
         """Init middleware with minimal headers for API behind AWS API Gateway + WAF."""
         super().__init__(app)
         self.security_headers = headers or {

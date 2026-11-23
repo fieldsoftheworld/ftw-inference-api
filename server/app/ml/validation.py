@@ -9,7 +9,7 @@ from app.core.geo import calculate_area_km2
 
 
 def validate_bbox(
-    bbox: Any, require_bbox: bool = False, max_area: float | None = None
+    bbox: object, require_bbox: bool = False, max_area: float | None = None
 ) -> None:
     """Validate bounding box coordinates and area constraints."""
     if require_bbox and not isinstance(bbox, list):
@@ -48,7 +48,7 @@ def validate_bbox(
             )
 
 
-def validate_image_urls(urls: Any, require_image_urls: bool = False) -> None:
+def validate_image_urls(urls: object, require_image_urls: bool = False) -> None:
     """Validate image URLs format and structure.
 
     Accepts 1 or 2 image URLs. Single-window models require 1 image,

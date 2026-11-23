@@ -2,7 +2,7 @@
 Protocol required because PynamoDBs metaclass design doesn't work well with MyPy.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 
 class DynamoTableMeta(Protocol):
@@ -22,6 +22,11 @@ class DynamoTable(Protocol):
         ...
 
     @classmethod
-    def create_table(cls, **kwargs: Any) -> Any:
+    def create_table(
+        cls,
+        wait: bool = False,
+        read_capacity_units: int | None = None,
+        write_capacity_units: int | None = None,
+    ) -> object:
         """Create the table with specified parameters."""
         ...
